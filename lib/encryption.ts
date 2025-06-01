@@ -13,4 +13,15 @@ export function encryptToken(token: string): string {
 export function decryptToken(encryptedToken: string): string {
   const bytes = CryptoJS.AES.decrypt(encryptedToken, ENCRYPTION_KEY)
   return bytes.toString(CryptoJS.enc.Utf8)
+}
+
+export function encryptText(text: string): Buffer {
+  const encrypted = CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString()
+  return Buffer.from(encrypted, 'utf8')
+}
+
+export function decryptText(encryptedBuffer: Buffer): string {
+  const encryptedString = encryptedBuffer.toString('utf8')
+  const bytes = CryptoJS.AES.decrypt(encryptedString, ENCRYPTION_KEY)
+  return bytes.toString(CryptoJS.enc.Utf8)
 } 
