@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { generateRandomString, generateCodeChallenge, generateState } from '@/lib/utils'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Generate PKCE parameters
     const codeVerifier = generateRandomString(128)
