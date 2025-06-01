@@ -23,6 +23,25 @@ interface TwitterTweet {
   }>
 }
 
+interface TweetBody {
+  text: string
+  reply?: {
+    in_reply_to_tweet_id: string
+  }
+}
+
+interface StreamRulesResponse {
+  data?: Array<{
+    id: string
+    value: string
+    tag?: string
+  }>
+  meta?: {
+    sent: string
+    result_count: number
+  }
+}
+
 export class TwitterAPI {
   private accessToken: string
   private bearerToken: string
@@ -100,7 +119,7 @@ export class TwitterAPI {
 
   // Create a tweet or reply
   async createTweet(text: string, replyToTweetId?: string): Promise<TwitterTweet> {
-    const body: any = { text }
+    const body: TweetBody = { text }
     
     if (replyToTweetId) {
       body.reply = { in_reply_to_tweet_id: replyToTweetId }
@@ -171,7 +190,7 @@ export class TwitterAPI {
   }
 
   // Get current stream rules
-  async getStreamRules(): Promise<any> {
+  async getStreamRules(): Promise<StreamRulesResponse> {
     const response = await fetch('https://api.x.com/2/tweets/search/stream/rules', {
       headers: {
         'Authorization': `Bearer ${this.bearerToken || this.accessToken}`,

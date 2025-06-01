@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { TwitterAPI, generateCodeVerifier, generateCodeChallenge } from '@/lib/twitter'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const state = Math.random().toString(36).substring(2, 15)
     const codeVerifier = generateCodeVerifier()

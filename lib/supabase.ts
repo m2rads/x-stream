@@ -29,7 +29,7 @@ export interface XTweet {
   status: 'open' | 'closed'
   assigned_to_clerk_id?: string
   assigned_to_ai: boolean
-  metadata?: any
+  metadata?: Record<string, unknown>
   created_at: string
   updated_at: string
   closed_at?: string

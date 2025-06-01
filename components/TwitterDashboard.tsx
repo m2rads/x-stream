@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,7 +31,7 @@ interface XTweet {
   status: 'open' | 'closed'
   assigned_to_clerk_id?: string
   assigned_to_ai: boolean
-  metadata?: any
+  metadata?: Record<string, unknown>
   created_at: string
   updated_at: string
   closed_at?: string
@@ -122,7 +121,7 @@ export default function TwitterDashboard() {
     }
   }
 
-  const decryptText = (encryptedText: Uint8Array): string => {
+  const decryptText = (): string => {
     // For demo purposes, we'll just show placeholder text
     // In a real app, you'd decrypt this properly
     return "This is a sample tweet reply that needs a response..."
@@ -276,7 +275,7 @@ export default function TwitterDashboard() {
                             {new Date(tweet.created_at).toLocaleString()}
                           </span>
                         </div>
-                        <p className="text-sm mb-3">{decryptText(tweet.encrypted_text)}</p>
+                        <p className="text-sm mb-3">{decryptText()}</p>
                         
                         {tweet.status === 'open' && (
                           <Dialog open={replyingToTweet?.id === tweet.id} onOpenChange={(open) => {
@@ -304,7 +303,7 @@ export default function TwitterDashboard() {
                               
                               <div className="space-y-4">
                                 <div className="p-3 bg-muted rounded-lg">
-                                  <p className="text-sm">{decryptText(tweet.encrypted_text)}</p>
+                                  <p className="text-sm">{decryptText()}</p>
                                 </div>
                                 
                                 <Textarea
