@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createSupabaseAdmin } from '@/lib/supabase'
 import { encryptToken } from '@/lib/encryption'
 
 export async function GET(request: NextRequest) {
@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
     // Encrypt tokens
     const encryptedAccessToken = encryptToken(access_token)
     const encryptedRefreshToken = refresh_token ? encryptToken(refresh_token) : null
+
+    // Create admin client for server-side database operations
+    const supabaseAdmin = createSupabaseAdmin()
 
     // Store/update account in database
     const { error: dbError } = await supabaseAdmin
