@@ -13,6 +13,9 @@ export default function Home() {
     setRepliesKey(prev => prev + 1)
   }
 
+  // Get the polling functionality but don't render the UI
+  const { manualPoll } = StreamControls({ onRepliesUpdate: handleRepliesUpdate })
+
   return (
     <main className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -21,15 +24,13 @@ export default function Home() {
             X Monitor Replies
           </h1>
           <p className="text-muted-foreground">
-            Connect your X account to start monitoring replies and mentions using polling
+            Connect your X account to start monitoring replies and mentions
           </p>
         </div>
         
         <XConnectionCard />
         
-        <StreamControls onRepliesUpdate={handleRepliesUpdate} />
-        
-        <RepliesList key={repliesKey} />
+        <RepliesList key={repliesKey} onRefresh={manualPoll} />
       </div>
     </main>
   )

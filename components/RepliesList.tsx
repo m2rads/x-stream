@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MessageCircle, ExternalLink } from 'lucide-react'
+import { MessageCircle, ExternalLink, RotateCcw } from 'lucide-react'
 
 interface Reply {
   id: string
@@ -15,10 +16,15 @@ interface Reply {
   created_at: string
 }
 
-export default function RepliesList() {
+interface RepliesListProps {
+  onRefresh?: () => Promise<void>
+}
+
+export default function RepliesList({ onRefresh }: RepliesListProps) {
   const [replies, setReplies] = useState<Reply[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchReplies()
@@ -42,6 +48,21 @@ export default function RepliesList() {
       setError(error instanceof Error ? error.message : 'Failed to fetch replies')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      try {
+        setRefreshing(true)
+        await onRefresh()
+        // Refresh the list after polling
+        await fetchReplies()
+      } catch (error) {
+        console.error('Refresh failed:', error)
+      } finally {
+        setRefreshing(false)
+      }
     }
   }
 
@@ -98,23 +119,40 @@ export default function RepliesList() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5" />
-          Recent Replies
-        </CardTitle>
-        <CardDescription>
-          {replies.length === 0 
-            ? 'No replies found yet. Start monitoring to capture new replies.'
-            : `${replies.length} replies found`
-          }
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              Recent Replies
+            </CardTitle>
+            <CardDescription>
+              {replies.length === 0 
+                ? 'No replies found yet. Check for new replies to capture them.'
+                : `${replies.length} replies found`
+              }
+            </CardDescription>
+          </div>
+          
+          {onRefresh && (
+            <Button 
+              onClick={handleRefresh}
+              variant="outline" 
+              size="sm"
+              disabled={refreshing}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Check for new replies
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {replies.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No replies yet</p>
-            <p className="text-sm">Start monitoring to see new replies here</p>
+            <p className="text-sm">Check for new replies to see them here</p>
           </div>
         ) : (
           <div className="space-y-4">

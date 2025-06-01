@@ -21,17 +21,14 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   const startMonitoring = async () => {
     try {
       setIsMonitoring(true)
-      
-      // Do initial poll
       await performPoll()
       
-      // Set up interval for regular polling
       const interval = setInterval(async () => {
         await performPoll()
       }, POLL_INTERVAL_MS)
       
       setPollInterval(interval)
-      toast.success('Started monitoring for replies (polling every 30 seconds)')
+      toast.success('Started monitoring for replies')
       
     } catch (error) {
       console.error('Failed to start monitoring:', error)
@@ -46,15 +43,14 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       setPollInterval(null)
     }
     setIsMonitoring(false)
-    toast.info('Stopped monitoring for replies')
+    toast.info('Stopped monitoring')
   }
 
   const performPoll = async () => {
     try {
-      console.log('Polling for new replies...')
       setLastPollTime(new Date())
       
-      const response = await fetch('/api/poll', {
+      const response = await fetch('/api/stream/poll', {
         method: 'POST',
       })
 
@@ -63,12 +59,11 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       }
 
       const data = await response.json()
-      console.log('Poll result:', data)
 
       if (data.totalNewReplies > 0) {
         setTotalReplies(prev => prev + data.totalNewReplies)
         toast.success(`Found ${data.totalNewReplies} new replies!`)
-        onRepliesUpdate() // Refresh the replies list
+        onRepliesUpdate()
       }
 
     } catch (error) {
@@ -78,12 +73,11 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   }
 
   const manualPoll = async () => {
-    if (!isMonitoring) {
+    // if (!isMonitoring) {
       await performPoll()
-    }
+    // }
   }
 
-  // Cleanup interval on unmount
   useEffect(() => {
     return () => {
       if (pollInterval) {
@@ -92,77 +86,53 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     }
   }, [pollInterval])
 
-  const formatLastPollTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
+  // Export the manual poll function for use in other components
+  return { manualPoll }
 
+  // Commented out UI - keeping for later use
+  /*
   return (
-    <div className="border rounded-lg p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Reply Monitoring</h3>
-        <Badge variant={isMonitoring ? "default" : "secondary"}>
-          {isMonitoring ? 'Active' : 'Inactive'}
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <Badge variant={isMonitoring ? "default" : "secondary"} className="text-xs">
+          {isMonitoring ? 'Monitoring' : 'Stopped'}
         </Badge>
-      </div>
-
-      <div className="space-y-2 text-sm text-muted-foreground">
-        <p>
-          Using polling-based monitoring (compatible with X API Free tier)
-        </p>
-        <div className="flex items-center gap-4">
-          <span>
-            Status: {isMonitoring ? 'Checking every 30 seconds' : 'Stopped'}
-          </span>
-          {lastPollTime && (
-            <span>
-              Last check: {formatLastPollTime(lastPollTime)}
-            </span>
-          )}
-        </div>
         {totalReplies > 0 && (
-          <div className="text-green-600 dark:text-green-400">
-            Total replies found: {totalReplies}
-          </div>
+          <Badge variant="outline" className="text-xs">
+            {totalReplies} replies
+          </Badge>
         )}
       </div>
-
-      <div className="flex gap-2">
+      
+      <div className="flex gap-1">
         {!isMonitoring ? (
-          <Button onClick={startMonitoring} className="flex items-center gap-2">
-            <Play className="h-4 w-4" />
-            Start Monitoring
+          <Button onClick={startMonitoring} size="sm" className="h-8 px-3">
+            <Play className="h-3 w-3 mr-1" />
+            Start
           </Button>
         ) : (
           <Button 
             onClick={stopMonitoring} 
             variant="destructive" 
-            className="flex items-center gap-2"
+            size="sm"
+            className="h-8 px-3"
           >
-            <Square className="h-4 w-4" />
-            Stop Monitoring
+            <Square className="h-3 w-3 mr-1" />
+            Stop
           </Button>
         )}
         
         <Button 
           onClick={manualPoll} 
           variant="outline" 
-          className="flex items-center gap-2"
+          size="sm"
+          className="h-8 px-3"
           disabled={isMonitoring}
         >
-          <RotateCcw className="h-4 w-4" />
-          Check Now
+          <RotateCcw className="h-3 w-3" />
         </Button>
-      </div>
-
-      <div className="text-xs text-muted-foreground">
-        Note: Polling uses your X API quota (Free tier: 100 posts/month). 
-        Each poll checks up to 10 recent replies per connected account.
       </div>
     </div>
   )
+  */
 } 
