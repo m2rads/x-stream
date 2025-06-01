@@ -1,16 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { generateRandomString, generateCodeChallenge, generateState } from '@/lib/utils'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Generate PKCE parameters
     const codeVerifier = generateRandomString(128)
     const codeChallenge = await generateCodeChallenge(codeVerifier)
     const state = generateState()
 
-    // Store PKCE parameters in session/cookies for later verification
-    const response = NextResponse.redirect(
-      `https://twitter.com/i/oauth2/authorize?` +
+    console.log('Generated OAuth parameters:', {
+      codeVerifier: codeVerifier.substring(0, 10) + '...',
+      codeChallenge: codeChallenge.substring(0, 10) + '...',
+      state: state
+    })
+
+    // Create authorization URL
+    const authUrl = `https://twitter.com/i/oauth2/authorize?` +
       new URLSearchParams({
         response_type: 'code',
         client_id: process.env.TWITTER_CLIENT_ID!,
@@ -20,22 +25,26 @@ export async function GET() {
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
       }).toString()
-    )
+
+    console.log('Authorization URL created, redirecting to X')
+
+    // Store PKCE parameters in session/cookies for later verification
+    const response = NextResponse.redirect(authUrl)
 
     // Store PKCE parameters in httpOnly cookies for security
-    response.cookies.set('oauth_code_verifier', codeVerifier, {
+    // Using more lenient cookie settings for development
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 600, // 10 minutes
-    })
+      path: '/', // Ensure cookies are available for all paths
+    }
 
-    response.cookies.set('oauth_state', state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 600, // 10 minutes
-    })
+    response.cookies.set('oauth_code_verifier', codeVerifier, cookieOptions)
+    response.cookies.set('oauth_state', state, cookieOptions)
+
+    console.log('Cookies set, redirecting user to X authorization')
 
     return response
   } catch (error) {

@@ -23,17 +23,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Verify state parameter
+    // Verify state parameter (handle URL encoding)
     const storedState = request.cookies.get('oauth_state')?.value
-    if (!storedState || storedState !== state) {
-      throw new Error('Invalid state parameter')
+    const decodedState = decodeURIComponent(state)
+    
+    console.log('Stored state:', storedState)
+    console.log('Received state:', state)
+    console.log('Decoded state:', decodedState)
+    
+    if (!storedState) {
+      throw new Error('Missing stored state parameter - cookies may have expired')
+    }
+    
+    if (storedState !== state && storedState !== decodedState) {
+      throw new Error(`Invalid state parameter. Expected: ${storedState}, Received: ${state}, Decoded: ${decodedState}`)
     }
 
     // Get code verifier from cookies
     const codeVerifier = request.cookies.get('oauth_code_verifier')?.value
     if (!codeVerifier) {
-      throw new Error('Missing code verifier')
+      throw new Error('Missing code verifier - cookies may have expired')
     }
+
+    console.log('Code verifier found, proceeding with token exchange')
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
@@ -54,11 +66,14 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text()
+      console.error('Token exchange failed:', errorData)
       throw new Error(`Token exchange failed: ${errorData}`)
     }
 
     const tokens = await tokenResponse.json()
     const { access_token, refresh_token, expires_in } = tokens
+
+    console.log('Token exchange successful, fetching user info')
 
     // Get user info from X API
     const userResponse = await fetch('https://api.twitter.com/2/users/me', {
@@ -68,11 +83,15 @@ export async function GET(request: NextRequest) {
     })
 
     if (!userResponse.ok) {
+      const userErrorData = await userResponse.text()
+      console.error('User info fetch failed:', userErrorData)
       throw new Error('Failed to fetch user info')
     }
 
     const userData = await userResponse.json()
     const { id: x_user_id, username: x_username } = userData.data
+
+    console.log('User info fetched successfully:', { x_user_id, x_username })
 
     // Calculate token expiration
     const tokenExpiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
@@ -107,6 +126,8 @@ export async function GET(request: NextRequest) {
       console.error('Database error:', dbError)
       throw new Error('Failed to store account data')
     }
+
+    console.log('Account stored successfully in database')
 
     // Clear OAuth cookies
     const response = NextResponse.redirect(
