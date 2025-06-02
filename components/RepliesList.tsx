@@ -142,7 +142,6 @@ export default function RepliesList({ onRefresh }: RepliesListProps) {
               className="flex items-center gap-2"
             >
               <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Check for new replies
             </Button>
           )}
         </div>
