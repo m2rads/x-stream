@@ -77,12 +77,10 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
     // Set up the auto-poll timer
     const pollTimeout = setTimeout(() => {
-      performPoll()
-      // After polling, set up regular 15-minute intervals
-      const pollInterval = setInterval(() => {
-        performPoll()
-      }, 15 * 60 * 1000)
-      setAutoPollInterval(pollInterval)
+      performPoll().then(() => {
+        // After first poll, restart auto-poll for regular intervals
+        startAutoPoll()
+      })
     }, timeUntilPoll)
 
     // Store the timeout as an interval for cleanup
@@ -169,10 +167,6 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       } else {
         toast.info('No new replies found')
       }
-
-      const nextTime = new Date()
-      nextTime.setMinutes(nextTime.getMinutes() + 15)
-      setNextPollTime(nextTime)
 
     } catch (error) {
       console.error('Poll error:', error)
