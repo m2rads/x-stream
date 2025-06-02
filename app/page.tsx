@@ -12,7 +12,7 @@ export default function Home() {
     setRepliesKey(prev => prev + 1)
   }
 
-  const { manualPoll, timeUntilNextPoll } = PollControls({ onRepliesUpdate: handleRepliesUpdate })
+  const { manualPoll, timeUntilNextPoll, onAccountConnected, onAccountDisconnected } = PollControls({ onRepliesUpdate: handleRepliesUpdate })
 
   return (
     <main className="min-h-screen bg-background p-8">
@@ -26,7 +26,7 @@ export default function Home() {
           </p>
         </div>
         
-        <XConnectionCard />
+        <XConnectionCard onAccountDisconnected={onAccountDisconnected} />
         
         <RepliesList 
           key={repliesKey} 

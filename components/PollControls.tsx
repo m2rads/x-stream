@@ -312,6 +312,15 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   }
 
   const manualPoll = async () => {
+    // Check if we have a connected account first
+    if (hasConnectedAccount === false) {
+      toast.error('Please connect your X account first to start monitoring replies', {
+        icon: <XCircle className="h-4 w-4 text-red-500" />,
+        duration: 4000,
+      })
+      return
+    }
+
     // Check if we're still in rate limit period
     const timeRemaining = getRateLimitTimeRemaining()
     if (timeRemaining) {
@@ -334,8 +343,31 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     setPollCompleted(prev => prev + 1)
   }
 
+  // Method to call when account gets disconnected
+  const onAccountDisconnected = () => {
+    console.log('Account disconnected, resetting all polling state...')
+    
+    // Clear all intervals
+    if (autoPollInterval) clearInterval(autoPollInterval)
+    if (countdownInterval) clearInterval(countdownInterval)
+    
+    // Reset all state
+    setHasConnectedAccount(false)
+    setNextPollTime(null)
+    setTimeUntilNextPoll('Connect account to start monitoring')
+    setAutoPollInterval(null)
+    setCountdownInterval(null)
+    setPollCompleted(0)
+    
+    // Clear localStorage to prevent privacy leaks
+    localStorage.removeItem('lastRateLimit')
+    localStorage.removeItem('rateLimitResetTime')
+    
+    console.log('All polling state and localStorage cleared')
+  }
+
   // Export the manual poll function and countdown for use in other components
-  return { manualPoll, timeUntilNextPoll, onAccountConnected }
+  return { manualPoll, timeUntilNextPoll, onAccountConnected, onAccountDisconnected }
 
   // Commented out UI - keeping for later use
   /*

@@ -155,7 +155,7 @@ function DisconnectDialog({
 }
 
 // Main component
-export default function XConnectionCard() {
+export default function XConnectionCard({ onAccountDisconnected }: { onAccountDisconnected?: () => void }) {
   const {
     accounts,
     loading,
@@ -183,6 +183,11 @@ export default function XConnectionCard() {
     await disconnectAccount(accountToDisconnect.id)
     setDialogOpen(false)
     setAccountToDisconnect(null)
+    
+    // Call the callback to reset polling state
+    if (onAccountDisconnected) {
+      onAccountDisconnected()
+    }
   }
 
   if (loading) {
