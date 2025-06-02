@@ -127,7 +127,7 @@ export default function RepliesList({ onRefresh }: RepliesListProps) {
             </CardTitle>
             <CardDescription>
               {replies.length === 0 
-                ? 'No replies found yet. Check for new replies to capture them.'
+                ? `${replies.length} replies found`
                 : `${replies.length} replies found`
               }
             </CardDescription>

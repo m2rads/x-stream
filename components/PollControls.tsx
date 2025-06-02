@@ -50,12 +50,22 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     try {
       // setLastPollTime(new Date())
       
-      const response = await fetch('/api/stream/poll', {
+      const response = await fetch('/api/poll', {
         method: 'POST',
       })
 
       if (!response.ok) {
-        throw new Error(`Poll failed: ${response.status}`)
+        // Handle specific error cases
+        if (response.status === 429) {
+          toast.error('Rate limit reached. Please wait before checking again. Rate limit is 1 request per 15 minutes :)')
+          return
+        } else if (response.status >= 500) {
+          toast.error('Server error. Please try again later.')
+          return
+        } else {
+          toast.error(`Request failed (${response.status}). Please try again.`)
+          return
+        }
       }
 
       const data = await response.json()
@@ -64,11 +74,13 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
         // setTotalReplies(prev => prev + data.totalNewReplies)
         toast.success(`Found ${data.totalNewReplies} new replies!`)
         onRepliesUpdate()
+      } else {
+        toast.info('No new replies found')
       }
 
     } catch (error) {
       console.error('Poll error:', error)
-      toast.error('Failed to check for new replies')
+      toast.error('Failed to check for new replies. Please check your connection.')
     }
   }
 
