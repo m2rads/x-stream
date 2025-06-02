@@ -17,6 +17,7 @@ export async function POST() {
     }
 
     let totalNewReplies = 0
+    let rateLimitHit = false
     const results = []
 
     for (const account of accounts) {
@@ -56,6 +57,12 @@ export async function POST() {
         if (!response.ok) {
           const errorText = await response.text()
           console.error(`Failed to search replies for @${account.x_username}:`, errorText)
+          
+          // Check for rate limit
+          if (response.status === 429) {
+            rateLimitHit = true
+          }
+          
           results.push({
             username: account.x_username,
             success: false,
@@ -120,6 +127,16 @@ export async function POST() {
           error: error instanceof Error ? error.message : 'Unknown error'
         })
       }
+    }
+
+    // If rate limit was hit, return 429 status
+    if (rateLimitHit) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        totalNewReplies,
+        accountResults: results,
+        message: 'Rate limit reached. Please wait before checking again.'
+      }, { status: 429 })
     }
 
     return NextResponse.json({
