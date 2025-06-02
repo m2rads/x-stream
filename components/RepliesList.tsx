@@ -161,7 +161,7 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
                !timeUntilNextPoll.includes('Connect account') && 
                !timeUntilNextPoll.includes('Waiting for account') && (
                 <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                  Auto-check in {timeUntilNextPoll}
+                  Polling in {timeUntilNextPoll}
                 </span>
               )}
               <Button 
