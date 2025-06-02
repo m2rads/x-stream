@@ -1,6 +1,6 @@
 'use client'
 
-// import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 // import { Button } from '@/components/ui/button'
 // import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -12,58 +12,120 @@ interface PollControlsProps {
 }
 
 export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
-  // const [isMonitoring, setIsMonitoring] = useState(false)
-  // const [lastPollTime, setLastPollTime] = useState<Date | null>(null)
-  // const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
-  // const [totalReplies, setTotalReplies] = useState(0)
+  const [nextPollTime, setNextPollTime] = useState<Date | null>(null)
+  const [timeUntilNextPoll, setTimeUntilNextPoll] = useState<string>('Polling...')
+  const [autoPollInterval, setAutoPollInterval] = useState<NodeJS.Timeout | null>(null)
+  const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null)
 
-  // const POLL_INTERVAL_MS = 30000 
+  // Start auto-polling when component mounts
+  useEffect(() => {
+    startAutoPoll()
+    return () => {
+      if (autoPollInterval) clearInterval(autoPollInterval)
+      if (countdownInterval) clearInterval(countdownInterval)
+    }
+  }, [])
 
-  // const startMonitoring = async () => {
-  //   try {
-  //     // setIsMonitoring(true)
-  //     await performPoll()
-      
-  //     const interval = setInterval(async () => {
-  //       await performPoll()
-  //     }, POLL_INTERVAL_MS)
-      
-  //     setPollInterval(interval)
-  //     toast.success('Started monitoring for replies')
-      
-  //   } catch (error) {
-  //     console.error('Failed to start monitoring:', error)
-  //     toast.error('Failed to start monitoring')
-  //     // setIsMonitoring(false)
-  //   }
-  // }
-
-  // const stopMonitoring = () => {
-  //   if (pollInterval) {
-  //     clearInterval(pollInterval)
-  //     setPollInterval(null)
-  //   }
-  //   setIsMonitoring(false)
-  //   toast.info('Stopped monitoring')
-  // }
-
-  const getRateLimitTimeRemaining = () => {
+  const getRateLimitEndTime = () => {
     const lastRateLimit = localStorage.getItem('lastRateLimit')
     if (!lastRateLimit) return null
     
     const rateLimitTime = new Date(lastRateLimit)
-    const now = new Date()
-    const timeDiff = (rateLimitTime.getTime() + 15 * 60 * 1000) - now.getTime() // 15 minutes in ms
+    const endTime = new Date(rateLimitTime.getTime() + 15 * 60 * 1000) // 15 minutes later
     
-    if (timeDiff <= 0) {
+    // Check if rate limit period has expired
+    if (endTime.getTime() <= Date.now()) {
       localStorage.removeItem('lastRateLimit')
       return null
     }
+    
+    return endTime
+  }
+
+  const getRateLimitTimeRemaining = () => {
+    const endTime = getRateLimitEndTime()
+    if (!endTime) return null
+    
+    const timeDiff = endTime.getTime() - Date.now()
+    if (timeDiff <= 0) return null
     
     const minutes = Math.floor(timeDiff / (1000 * 60))
     const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000)
     
     return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const startAutoPoll = () => {
+    // First, check if we're in a rate limit period
+    const rateLimitEndTime = getRateLimitEndTime()
+    let nextPollTime: Date
+
+    if (rateLimitEndTime) {
+      // If we're rate limited, next poll should be when rate limit expires
+      nextPollTime = rateLimitEndTime
+      console.log('Rate limit active, next poll at:', nextPollTime)
+    } else {
+      // No rate limit, poll in 15 minutes
+      nextPollTime = new Date()
+      nextPollTime.setMinutes(nextPollTime.getMinutes() + 15)
+      console.log('No rate limit, next poll in 15 minutes at:', nextPollTime)
+    }
+
+    setNextPollTime(nextPollTime)
+
+    // Clear any existing intervals
+    if (autoPollInterval) clearInterval(autoPollInterval)
+    if (countdownInterval) clearInterval(countdownInterval)
+
+    // Calculate how long until the next poll
+    const timeUntilPoll = nextPollTime.getTime() - Date.now()
+
+    // Set up the auto-poll timer
+    const pollTimeout = setTimeout(() => {
+      performPoll()
+      // After polling, set up regular 15-minute intervals
+      const pollInterval = setInterval(() => {
+        performPoll()
+      }, 15 * 60 * 1000)
+      setAutoPollInterval(pollInterval)
+    }, timeUntilPoll)
+
+    // Store the timeout as an interval for cleanup
+    setAutoPollInterval(pollTimeout as any)
+
+    // Start countdown update interval (every second)
+    const countdown = setInterval(updateCountdown, 1000)
+    setCountdownInterval(countdown)
+    
+    // Update countdown immediately
+    updateCountdown()
+  }
+
+  const updateCountdown = () => {
+    // First check if we're in a rate limit period (same logic as toast)
+    const rateLimitTime = getRateLimitTimeRemaining()
+    if (rateLimitTime) {
+      setTimeUntilNextPoll(rateLimitTime)
+      return
+    }
+
+    // If no rate limit, use the regular nextPollTime
+    if (!nextPollTime) {
+      setTimeUntilNextPoll('15:00') // Default to 15 minutes
+      return
+    }
+
+    const now = new Date()
+    const timeDiff = nextPollTime.getTime() - now.getTime()
+
+    if (timeDiff <= 0) {
+      setTimeUntilNextPoll('Checking now...')
+      return
+    }
+
+    const minutes = Math.floor(timeDiff / (1000 * 60))
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000)
+    setTimeUntilNextPoll(`${minutes}:${seconds.toString().padStart(2, '0')}`)
   }
 
   const showRateLimitToast = () => {
@@ -80,7 +142,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
   const performPoll = async () => {
     try {
-      // setLastPollTime(new Date())
+      setTimeUntilNextPoll('Checking now...')
       
       const response = await fetch('/api/poll', {
         method: 'POST',
@@ -92,6 +154,9 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
           // Store the rate limit time
           localStorage.setItem('lastRateLimit', new Date().toISOString())
           showRateLimitToast()
+          
+          // Restart auto-poll to sync with rate limit
+          startAutoPoll()
           return
         } else if (response.status >= 500) {
           toast.error('Server error. Please try again later.', {
@@ -109,12 +174,16 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       const data = await response.json()
 
       if (data.totalNewReplies > 0) {
-        // setTotalReplies(prev => prev + data.totalNewReplies)
         toast.success(`Found ${data.totalNewReplies} new replies!`)
         onRepliesUpdate()
       } else {
         toast.info('No new replies found')
       }
+
+      // After successful poll, set next poll time to 15 minutes from now
+      const nextTime = new Date()
+      nextTime.setMinutes(nextTime.getMinutes() + 15)
+      setNextPollTime(nextTime)
 
     } catch (error) {
       console.error('Poll error:', error)
@@ -132,21 +201,14 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       return
     }
     
-    // if (!isMonitoring) {
-      await performPoll()
-    // }
+    await performPoll()
+    
+    // Restart auto-poll timer after manual poll
+    startAutoPoll()
   }
 
-  // useEffect(() => {
-  //   return () => {
-  //     if (pollInterval) {
-  //       clearInterval(pollInterval)
-  //     }
-  //   }
-  // }, [pollInterval])
-
-  // Export the manual poll function for use in other components
-  return { manualPoll }
+  // Export the manual poll function and countdown for use in other components
+  return { manualPoll, timeUntilNextPoll }
 
   // Commented out UI - keeping for later use
   /*

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import XConnectionCard from '@/components/XConnectionCard'
-import StreamControls from '@/components/PollControls'
+import PollControls from '@/components/PollControls'
 import RepliesList from '@/components/RepliesList'
 
 export default function Home() {
@@ -12,7 +12,7 @@ export default function Home() {
     setRepliesKey(prev => prev + 1)
   }
 
-  const { manualPoll } = StreamControls({ onRepliesUpdate: handleRepliesUpdate })
+  const { manualPoll, timeUntilNextPoll } = PollControls({ onRepliesUpdate: handleRepliesUpdate })
 
   return (
     <main className="min-h-screen bg-background p-8">
@@ -28,7 +28,11 @@ export default function Home() {
         
         <XConnectionCard />
         
-        <RepliesList key={repliesKey} onRefresh={manualPoll} />
+        <RepliesList 
+          key={repliesKey} 
+          onRefresh={manualPoll} 
+          timeUntilNextPoll={timeUntilNextPoll}
+        />
       </div>
     </main>
   )

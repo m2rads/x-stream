@@ -18,9 +18,10 @@ interface Reply {
 
 interface RepliesListProps {
   onRefresh?: () => Promise<void>
+  timeUntilNextPoll?: string
 }
 
-export default function RepliesList({ onRefresh }: RepliesListProps) {
+export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesListProps) {
   const [replies, setReplies] = useState<Reply[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -134,15 +135,20 @@ export default function RepliesList({ onRefresh }: RepliesListProps) {
           </div>
           
           {onRefresh && (
-            <Button 
-              onClick={handleRefresh}
-              variant="outline" 
-              size="sm"
-              disabled={refreshing}
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                Polling in {timeUntilNextPoll || 'initializing...'}
+              </span>
+              <Button 
+                onClick={handleRefresh}
+                variant="outline" 
+                size="sm"
+                disabled={refreshing}
+                className="flex items-center gap-2"
+              >
+                <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>

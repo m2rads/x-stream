@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { decryptToken, encryptText } from '@/lib/encryption'
+import { decryptToken } from '@/lib/encryption'
 
 export async function POST() {
   try {
@@ -82,15 +82,12 @@ export async function POST() {
           // Find the author info
           const author = users.find((user: { id: string }) => user.id === tweet.author_id)
           
-          // Encrypt the tweet text
-          const encryptedText = encryptText(tweet.text)
-          
-          // Prepare tweet data for storage (matching existing schema)
+          // Prepare tweet data for storage (no encryption needed for public tweets)
           const tweetData = {
             x_tweet_id: tweet.id,
             x_author_id: tweet.author_id,
             x_author_username: author?.username || 'unknown',
-            encrypted_text: encryptedText,
+            encrypted_text: Buffer.from(tweet.text, 'utf8'), // Store as plain text in Buffer format
             in_reply_to_tweet_id: tweet.in_reply_to_user_id,
             status: 'open' as const,
             metadata: {
