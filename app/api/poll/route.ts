@@ -94,10 +94,13 @@ export async function POST() {
             }
           }
 
-          // Store in database
+          // Store in database using upsert to handle duplicates
           const { error: insertError } = await supabaseAdmin
             .from('x_tweets')
-            .insert(tweetData)
+            .upsert(tweetData, { 
+              onConflict: 'x_tweet_id',
+              ignoreDuplicates: false 
+            })
 
           if (insertError) {
             console.error('Error storing tweet:', insertError)
