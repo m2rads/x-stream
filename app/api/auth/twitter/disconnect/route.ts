@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = createSupabaseAdmin()
 
-    // First, get the account details to find the x_user_id
+    // First, get the account details to find the x_username
     const { data: account, error: accountError } = await supabaseAdmin
       .from('x_accounts')
-      .select('x_user_id')
+      .select('x_username, x_user_id')
       .eq('id', accountId)
       .single()
 
@@ -28,15 +28,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Delete all associated tweets first
-    const { error: tweetsError } = await supabaseAdmin
+    console.log(`Disconnecting account: ${account.x_username}`)
+
+    // Delete all tweets that are replies TO this account (where this account is the target)
+    const { error: repliesError, count: repliesCount } = await supabaseAdmin
       .from('x_tweets')
-      .delete()
+      .delete({ count: 'exact' })
+      .eq('metadata->>target_username', account.x_username)
+
+    if (repliesError) {
+      console.error('Error deleting reply tweets:', repliesError)
+    } else {
+      console.log(`Deleted ${repliesCount} reply tweets for @${account.x_username}`)
+    }
+
+    // Also delete any tweets authored BY this account (if any exist)
+    const { error: authoredError, count: authoredCount } = await supabaseAdmin
+      .from('x_tweets')
+      .delete({ count: 'exact' })
       .eq('x_author_id', account.x_user_id)
 
-    if (tweetsError) {
-      console.error('Error deleting tweets:', tweetsError)
-      // Continue with account deletion even if tweet deletion fails
+    if (authoredError) {
+      console.error('Error deleting authored tweets:', authoredError)
+    } else {
+      console.log(`Deleted ${authoredCount} authored tweets for @${account.x_username}`)
     }
 
     // Delete the account record
@@ -53,9 +68,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const totalDeleted = (repliesCount || 0) + (authoredCount || 0)
+    console.log(`Account @${account.x_username} disconnected successfully. Deleted ${totalDeleted} total tweets.`)
+
     return NextResponse.json({ 
       success: true, 
-      message: 'Account disconnected and all data removed successfully' 
+      message: `Account disconnected and all data removed successfully. Deleted ${totalDeleted} tweets.`
     })
 
   } catch (error) {
