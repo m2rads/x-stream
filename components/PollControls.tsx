@@ -4,6 +4,7 @@
 // import { Button } from '@/components/ui/button'
 // import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { AlertTriangle, XCircle } from 'lucide-react'
 // import { Play, Square, RotateCcw } from 'lucide-react'
 
 interface PollControlsProps {
@@ -46,6 +47,37 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   //   toast.info('Stopped monitoring')
   // }
 
+  const getRateLimitTimeRemaining = () => {
+    const lastRateLimit = localStorage.getItem('lastRateLimit')
+    if (!lastRateLimit) return null
+    
+    const rateLimitTime = new Date(lastRateLimit)
+    const now = new Date()
+    const timeDiff = (rateLimitTime.getTime() + 15 * 60 * 1000) - now.getTime() // 15 minutes in ms
+    
+    if (timeDiff <= 0) {
+      localStorage.removeItem('lastRateLimit')
+      return null
+    }
+    
+    const minutes = Math.floor(timeDiff / (1000 * 60))
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000)
+    
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const showRateLimitToast = () => {
+    const timeRemaining = getRateLimitTimeRemaining()
+    const message = timeRemaining 
+      ? `Rate limit: 1 request per 15 minutes. ${timeRemaining} left`
+      : 'Rate limit: 1 request per 15 minutes. Try again later'
+    
+    toast.error(message, {
+      icon: <AlertTriangle className="h-4 w-4 text-orange-500" />,
+      duration: 5000,
+    })
+  }
+
   const performPoll = async () => {
     try {
       // setLastPollTime(new Date())
@@ -57,13 +89,19 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       if (!response.ok) {
         // Handle specific error cases
         if (response.status === 429) {
-          toast.error('Rate limit reached. Please wait before checking again. Rate limit is 1 request per 15 minutes :)')
+          // Store the rate limit time
+          localStorage.setItem('lastRateLimit', new Date().toISOString())
+          showRateLimitToast()
           return
         } else if (response.status >= 500) {
-          toast.error('Server error. Please try again later.')
+          toast.error('Server error. Please try again later.', {
+            icon: <XCircle className="h-4 w-4 text-red-500" />,
+          })
           return
         } else {
-          toast.error(`Request failed (${response.status}). Please try again.`)
+          toast.error(`Request failed (${response.status}). Please try again.`, {
+            icon: <XCircle className="h-4 w-4 text-red-500" />,
+          })
           return
         }
       }
@@ -80,11 +118,20 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
     } catch (error) {
       console.error('Poll error:', error)
-      toast.error('Failed to check for new replies. Please check your connection.')
+      toast.error('Failed to check for new replies. Please check your connection.', {
+        icon: <XCircle className="h-4 w-4 text-red-500" />,
+      })
     }
   }
 
   const manualPoll = async () => {
+    // Check if we're still in rate limit period
+    const timeRemaining = getRateLimitTimeRemaining()
+    if (timeRemaining) {
+      showRateLimitToast()
+      return
+    }
+    
     // if (!isMonitoring) {
       await performPoll()
     // }
