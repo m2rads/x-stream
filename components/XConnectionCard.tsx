@@ -212,7 +212,7 @@ export default function XConnectionCard() {
               Account Connection
             </CardTitle>
             <CardDescription>
-              Connect your X account to monitor replies and mentions
+              Monitor replies to your posts periodically
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -230,18 +230,7 @@ export default function XConnectionCard() {
                       disconnecting={disconnecting === account.id}
                     />
                   ))}
-                </div>
-
-                {/* Add Another Account Button */}
-                <Button 
-                  onClick={connectAccount} 
-                  disabled={connecting}
-                  variant="outline"
-                  className="w-full"
-                  size="lg"
-                >
-                  {connecting ? LOADING_STATES.CONNECTING : 'Connect Another Account'}
-                </Button>
+                </div> 
               </div>
             )}
           </CardContent>
