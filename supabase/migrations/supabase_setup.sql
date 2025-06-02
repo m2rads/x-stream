@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS x_tweets (
     x_tweet_id TEXT UNIQUE NOT NULL,
     x_author_id TEXT NOT NULL,
     x_author_username TEXT NOT NULL,
-    encrypted_text BYTEA NOT NULL,
+    encrypted_text TEXT NOT NULL,
     in_reply_to_tweet_id TEXT,
     status TEXT CHECK (status IN ('open', 'closed')) DEFAULT 'open',
     assigned_to_clerk_id TEXT,
