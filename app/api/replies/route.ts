@@ -5,9 +5,38 @@ export async function GET() {
   try {
     const supabaseAdmin = createSupabaseAdmin()
     
+    // First, get the list of connected account usernames
+    const { data: connectedAccounts, error: accountsError } = await supabaseAdmin
+      .from('x_accounts')
+      .select('x_username')
+      .eq('is_connected', true)
+
+    if (accountsError) {
+      console.error('Database error fetching accounts:', accountsError)
+      return NextResponse.json(
+        { error: 'Failed to fetch connected accounts' },
+        { status: 500 }
+      )
+    }
+
+    // If no connected accounts, return empty
+    if (!connectedAccounts || connectedAccounts.length === 0) {
+      return NextResponse.json({
+        success: true,
+        replies: [],
+        count: 0,
+        message: 'No connected accounts found'
+      })
+    }
+
+    // Get usernames array
+    const connectedUsernames = connectedAccounts.map(acc => acc.x_username)
+    
+    // Get replies only for connected accounts
     const { data: replies, error } = await supabaseAdmin
       .from('x_tweets')
       .select('*')
+      .in('metadata->>target_username', connectedUsernames)
       .order('created_at', { ascending: false })
       .limit(50)
 
@@ -19,6 +48,7 @@ export async function GET() {
       )
     }
 
+    // Transform the data to match the expected format
     const transformedReplies = (replies || []).map(reply => {
       return {
         id: reply.id,

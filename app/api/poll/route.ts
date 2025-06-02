@@ -17,6 +17,7 @@ export async function POST() {
 
     let totalNewReplies = 0
     let rateLimitHit = false
+    let rateLimitResetTime = null
     const results = []
 
     for (const account of accounts) {
@@ -53,6 +54,56 @@ export async function POST() {
           },
         })
 
+        // === LOG COMPLETE X API RESPONSE ===
+        console.log('='.repeat(50))
+        console.log(`X API Response for @${account.x_username}`)
+        console.log('='.repeat(50))
+        console.log('Status:', response.status)
+        console.log('Status Text:', response.statusText)
+        console.log('URL:', response.url)
+        
+        console.log('\n--- ALL RESPONSE HEADERS ---')
+        response.headers.forEach((value, key) => {
+          console.log(`${key}: ${value}`)
+        })
+        
+        console.log('\n--- RATE LIMIT SPECIFIC HEADERS ---')
+        const rateLimitHeaders = [
+          'x-rate-limit-limit',
+          'x-rate-limit-remaining', 
+          'x-rate-limit-reset',
+          'x-rate-limit-reset-at',
+          'retry-after',
+          'x-ratelimit-limit',
+          'x-ratelimit-remaining',
+          'x-ratelimit-reset',
+          'ratelimit-limit',
+          'ratelimit-remaining', 
+          'ratelimit-reset'
+        ]
+        
+        rateLimitHeaders.forEach(header => {
+          const value = response.headers.get(header)
+          if (value) {
+            console.log(`${header}: ${value}`)
+          }
+        })
+        
+        // Clone response to read body without consuming it
+        const responseClone = response.clone()
+        const responseText = await responseClone.text()
+        
+        console.log('\n--- RESPONSE BODY ---')
+        console.log('Body length:', responseText.length)
+        console.log('Body preview (first 500 chars):')
+        console.log(responseText.substring(0, 500))
+        
+        if (responseText.length > 500) {
+          console.log('... (truncated)')
+        }
+        
+        console.log('='.repeat(50))
+
         if (!response.ok) {
           const errorText = await response.text()
           console.error(`Failed to search replies for @${account.x_username}:`, errorText)
@@ -60,6 +111,12 @@ export async function POST() {
           // Check for rate limit
           if (response.status === 429) {
             rateLimitHit = true
+            // Capture the precise reset time from X API
+            const resetHeader = response.headers.get('x-rate-limit-reset')
+            if (resetHeader) {
+              rateLimitResetTime = resetHeader
+              console.log('Captured rate limit reset time:', rateLimitResetTime)
+            }
           }
           
           results.push({
@@ -131,7 +188,8 @@ export async function POST() {
         error: 'Rate limit exceeded',
         totalNewReplies,
         accountResults: results,
-        message: 'Rate limit reached. Please wait before checking again.'
+        message: 'Rate limit reached. Please wait before checking again.',
+        rateLimitResetTime
       }, { status: 429 })
     }
 

@@ -136,9 +136,13 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
           
           {onRefresh && (
             <div className="flex items-center gap-3">
-              <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                Polling in {timeUntilNextPoll || 'initializing...'}
-              </span>
+              {timeUntilNextPoll && 
+               !timeUntilNextPoll.includes('Connect account') && 
+               !timeUntilNextPoll.includes('Waiting for account') && (
+                <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                  Auto-check in {timeUntilNextPoll}
+                </span>
+              )}
               <Button 
                 onClick={handleRefresh}
                 variant="outline" 

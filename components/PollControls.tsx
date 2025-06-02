@@ -13,29 +13,93 @@ interface PollControlsProps {
 
 export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   const [nextPollTime, setNextPollTime] = useState<Date | null>(null)
-  const [timeUntilNextPoll, setTimeUntilNextPoll] = useState<string>('Polling...')
+  const [timeUntilNextPoll, setTimeUntilNextPoll] = useState<string>('Waiting for account...')
   const [autoPollInterval, setAutoPollInterval] = useState<NodeJS.Timeout | null>(null)
   const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null)
-  const [pollCompleted, setPollCompleted] = useState<number>(0) // Trigger to restart countdown
+  const [pollCompleted, setPollCompleted] = useState<number>(0)
+  const [hasConnectedAccount, setHasConnectedAccount] = useState<boolean | null>(null)
 
-  // Effect to restart countdown when polling completes
-  useEffect(() => {
-    if (pollCompleted > 0) {
-      console.log('Poll completed, restarting countdown')
-      startAutoPoll()
+  // Check if accounts are connected by trying a poll
+  const checkAccountConnection = async () => {
+    try {
+      // Just try the poll endpoint - it will tell us if there are connected accounts
+      const response = await fetch('/api/poll', {
+        method: 'POST',
+      })
+      
+      if (response.status === 404) {
+        // 404 means "No connected accounts found"
+        console.log('No connected accounts found')
+        setHasConnectedAccount(false)
+        return false
+      } else if (response.status === 429 || response.ok) {
+        // Rate limited or successful = we have connected accounts
+        console.log('Connected accounts detected')
+        setHasConnectedAccount(true)
+        return true
+      } else {
+        // Other errors might be temporary
+        console.log('Unknown status, assuming no connection:', response.status)
+        setHasConnectedAccount(false)
+        return false
+      }
+    } catch (error) {
+      console.error('Error checking account connection:', error)
+      setHasConnectedAccount(false)
+      return false
     }
-  }, [pollCompleted]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
-  // Start auto-polling when component mounts
+  // Effect to check account connection and start polling
   useEffect(() => {
-    startAutoPoll()
+    const initializePolling = async () => {
+      console.log('Checking account connection on mount...')
+      setTimeUntilNextPoll('Checking connection...')
+      
+      // The check itself is a poll, so if it succeeds, we've done our initial poll
+      const connected = await checkAccountConnection()
+      
+      if (connected) {
+        console.log('Account connected, starting countdown...')
+        // We already polled during the check, so just start the countdown
+        setPollCompleted(prev => prev + 1)
+      } else {
+        console.log('No connected account, waiting...')
+        setTimeUntilNextPoll('Connect account to start monitoring')
+      }
+    }
+
+    initializePolling()
+    
     return () => {
       if (autoPollInterval) clearInterval(autoPollInterval)
       if (countdownInterval) clearInterval(countdownInterval)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Effect to restart countdown when polling completes
+  useEffect(() => {
+    if (pollCompleted > 0 && hasConnectedAccount) {
+      console.log('Poll completed, restarting countdown')
+      startAutoPoll()
+    }
+  }, [pollCompleted, hasConnectedAccount]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const getRateLimitEndTime = () => {
+    // First check if we have a precise reset time from API headers
+    const resetTime = localStorage.getItem('rateLimitResetTime')
+    if (resetTime) {
+      const resetDate = new Date(resetTime)
+      // Check if reset time has passed
+      if (resetDate.getTime() <= Date.now()) {
+        localStorage.removeItem('rateLimitResetTime')
+        localStorage.removeItem('lastRateLimit')
+        return null
+      }
+      return resetDate
+    }
+    
+    // Fallback to calculated time from lastRateLimit
     const lastRateLimit = localStorage.getItem('lastRateLimit')
     if (!lastRateLimit) return null
     
@@ -164,6 +228,13 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   }
 
   const performPoll = async () => {
+    // Don't poll if no account connected
+    if (hasConnectedAccount === false) {
+      console.log('No connected account, skipping poll')
+      setTimeUntilNextPoll('Connect account to start monitoring')
+      return
+    }
+
     try {
       setTimeUntilNextPoll('Checking now...')
       
@@ -171,12 +242,42 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
         method: 'POST',
       })
 
+      // Log all rate limit related headers
+      console.log('=== API Response Headers ===')
+      console.log('Status:', response.status)
+      console.log('x-rate-limit-limit:', response.headers.get('x-rate-limit-limit'))
+      console.log('x-rate-limit-remaining:', response.headers.get('x-rate-limit-remaining'))
+      console.log('x-rate-limit-reset:', response.headers.get('x-rate-limit-reset'))
+      console.log('x-rate-limit-reset-at:', response.headers.get('x-rate-limit-reset-at'))
+      console.log('retry-after:', response.headers.get('retry-after'))
+      
+      // Log all headers for debugging
+      console.log('All headers:')
+      response.headers.forEach((value, key) => {
+        if (key.includes('rate') || key.includes('limit') || key.includes('retry')) {
+          console.log(`  ${key}: ${value}`)
+        }
+      })
+      console.log('========================')
+
       if (!response.ok) {
         if (response.status === 429) {
           // Store the rate limit time
           localStorage.setItem('lastRateLimit', new Date().toISOString())
-          showRateLimitToast()
           
+          // Try to get the response data for precise reset time
+          try {
+            const errorData = await response.json()
+            if (errorData.rateLimitResetTime) {
+              const resetTime = new Date(parseInt(errorData.rateLimitResetTime) * 1000)
+              localStorage.setItem('rateLimitResetTime', resetTime.toISOString())
+              console.log('Using precise X API reset time:', resetTime)
+            }
+          } catch (e) {
+            console.log('Could not parse error response for reset time')
+          }
+          
+          showRateLimitToast()
           startAutoPoll()
           return
         } else if (response.status >= 500) {
@@ -193,6 +294,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       }
 
       const data = await response.json()
+      console.log('Poll response data:', data)
 
       if (data.totalNewReplies > 0) {
         toast.success(`Found ${data.totalNewReplies} new replies!`)
@@ -223,7 +325,17 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     setPollCompleted(prev => prev + 1)
   }
 
-  return { manualPoll, timeUntilNextPoll }
+  // Method to call when account gets connected
+  const onAccountConnected = async () => {
+    console.log('Account connected, starting polling...')
+    setHasConnectedAccount(true)
+    setTimeUntilNextPoll('Starting initial check...')
+    await performPoll()
+    setPollCompleted(prev => prev + 1)
+  }
+
+  // Export the manual poll function and countdown for use in other components
+  return { manualPoll, timeUntilNextPoll, onAccountConnected }
 
   // Commented out UI - keeping for later use
   /*
