@@ -5,12 +5,11 @@ export async function GET() {
   try {
     const supabaseAdmin = createSupabaseAdmin()
     
-    // Get all replies, ordered by most recent first
     const { data: replies, error } = await supabaseAdmin
       .from('x_tweets')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(50) // Limit to 50 most recent replies
+      .limit(50)
 
     if (error) {
       console.error('Database error:', error)
@@ -20,12 +19,11 @@ export async function GET() {
       )
     }
 
-    // Transform the data to match the expected format (no decryption needed)
     const transformedReplies = (replies || []).map(reply => {
       return {
         id: reply.id,
         tweet_id: reply.x_tweet_id,
-        text: reply.encrypted_text ? reply.encrypted_text.toString('utf8') : '[No text]',
+        text: reply.encrypted_text || '[No text]',
         author_id: reply.x_author_id,
         author_username: reply.x_author_username,
         target_username: reply.metadata?.target_username || 'unknown',

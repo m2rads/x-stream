@@ -6,7 +6,6 @@ export async function POST() {
   try {
     const supabaseAdmin = createSupabaseAdmin()
     
-    // Get all connected accounts
     const { data: accounts } = await supabaseAdmin
       .from('x_accounts')
       .select('x_username, encrypted_access_token_id')
@@ -77,17 +76,14 @@ export async function POST() {
 
         console.log(`Found ${tweets.length} new replies for @${account.x_username}`)
 
-        // Process and store new replies
         for (const tweet of tweets) {
-          // Find the author info
           const author = users.find((user: { id: string }) => user.id === tweet.author_id)
           
-          // Prepare tweet data for storage (no encryption needed for public tweets)
           const tweetData = {
             x_tweet_id: tweet.id,
             x_author_id: tweet.author_id,
             x_author_username: author?.username || 'unknown',
-            encrypted_text: Buffer.from(tweet.text, 'utf8'), // Store as plain text in Buffer format
+            encrypted_text: tweet.text,
             in_reply_to_tweet_id: tweet.in_reply_to_user_id,
             status: 'open' as const,
             metadata: {
