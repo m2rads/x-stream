@@ -60,15 +60,16 @@ function AccountItem({
   disconnecting: boolean
 }) {
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+    <div className="p-4 border rounded-lg hover:bg-accent/50 transition-colors space-y-3">
+      {/* Top row: Avatar and account info */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
           <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
           </svg>
         </div>
-        <div>
-          <p className="font-semibold">@{account.x_username}</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold truncate">@{account.x_username}</p>
           <p className="text-xs text-muted-foreground">
             Connected {new Date(account.connected_at!).toLocaleDateString('en-US', {
               year: 'numeric',
@@ -78,8 +79,10 @@ function AccountItem({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <Badge variant="secondary" className="bg-green-100 text-green-700">
+      
+      {/* Bottom row: Status badge and disconnect button */}
+      <div className="flex items-center justify-between gap-3 sm:flex-row flex-col">
+        <Badge variant="secondary" className="bg-green-100 text-green-700 sm:w-auto w-full justify-center">
           Connected
         </Badge>
         <Button
@@ -87,6 +90,7 @@ function AccountItem({
           size="sm"
           onClick={() => onDisconnect(account)}
           disabled={disconnecting}
+          className="sm:w-auto w-full"
         >
           {disconnecting ? LOADING_STATES.DISCONNECTING : 'Disconnect'}
         </Button>
@@ -214,7 +218,7 @@ export default function XConnectionCard({
 
   return (
     <>
-      <div className="w-full max-w-md mx-auto space-y-4">
+      <div className="w-full max-w-lg mx-auto space-y-4 px-4 sm:px-0">
         {/* Error Display */}
         {error && (
           <ErrorDisplay
@@ -228,13 +232,13 @@ export default function XConnectionCard({
         {/* Main Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
               Account Connection
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Monitor replies to your posts periodically
             </CardDescription>
           </CardHeader>
