@@ -42,7 +42,7 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
       setError(null)
       setLoading(false)
     }
-  }, [hasConnectedAccounts, accountsLoading])
+  }, [hasConnectedAccounts, accountsLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchReplies = async () => {
     // Don't fetch if no accounts connected

@@ -273,7 +273,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
               localStorage.setItem('rateLimitResetTime', resetTime.toISOString())
               console.log('Using precise X API reset time:', resetTime)
             }
-          } catch (e) {
+          } catch (e) { // eslint-disable-line @typescript-eslint/no-unused-vars
             console.log('Could not parse error response for reset time')
           }
           
