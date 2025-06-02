@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -155,7 +155,13 @@ function DisconnectDialog({
 }
 
 // Main component
-export default function XConnectionCard({ onAccountDisconnected }: { onAccountDisconnected?: () => void }) {
+export default function XConnectionCard({ 
+  onAccountConnected, 
+  onAccountDisconnected 
+}: { 
+  onAccountConnected?: () => void
+  onAccountDisconnected?: () => void 
+}) {
   const {
     accounts,
     loading,
@@ -171,6 +177,18 @@ export default function XConnectionCard({ onAccountDisconnected }: { onAccountDi
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accountToDisconnect, setAccountToDisconnect] = useState<XAccount | null>(null)
+  const [previousAccountCount, setPreviousAccountCount] = useState(0)
+
+  // Watch for account count changes to detect successful connections
+  useEffect(() => {
+    if (accounts.length > previousAccountCount && previousAccountCount >= 0) {
+      // A new account was added, trigger initial poll
+      if (onAccountConnected) {
+        onAccountConnected()
+      }
+    }
+    setPreviousAccountCount(accounts.length)
+  }, [accounts.length, previousAccountCount, onAccountConnected])
 
   const handleDisconnectClick = (account: XAccount) => {
     setAccountToDisconnect(account)

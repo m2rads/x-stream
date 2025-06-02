@@ -26,7 +26,10 @@ export default function Home() {
           </p>
         </div>
         
-        <XConnectionCard onAccountDisconnected={onAccountDisconnected} />
+        <XConnectionCard 
+          onAccountConnected={onAccountConnected}
+          onAccountDisconnected={onAccountDisconnected} 
+        />
         
         <RepliesList 
           key={repliesKey} 

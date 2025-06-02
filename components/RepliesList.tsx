@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageCircle, ExternalLink, RotateCcw } from 'lucide-react'
+import { useXAccounts } from '@/hooks/useXAccounts'
 
 interface Reply {
   id: string
@@ -23,15 +24,33 @@ interface RepliesListProps {
 
 export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesListProps) {
   const [replies, setReplies] = useState<Reply[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Get account connection status
+  const { accounts, loading: accountsLoading } = useXAccounts()
+  const hasConnectedAccounts = accounts.length > 0
 
   useEffect(() => {
-    fetchReplies()
-  }, [])
+    // Only fetch replies if we have connected accounts
+    if (hasConnectedAccounts && !accountsLoading) {
+      fetchReplies()
+    } else if (!accountsLoading) {
+      // If no accounts and not loading, clear any existing data
+      setReplies([])
+      setError(null)
+      setLoading(false)
+    }
+  }, [hasConnectedAccounts, accountsLoading])
 
   const fetchReplies = async () => {
+    // Don't fetch if no accounts connected
+    if (!hasConnectedAccounts) {
+      setReplies([])
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -81,7 +100,7 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
     return `https://twitter.com/${reply.author_username}/status/${reply.tweet_id}`
   }
 
-  if (loading) {
+  if (accountsLoading || loading) {
     return (
       <Card>
         <CardHeader>
@@ -92,7 +111,7 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            Loading replies...
+            {accountsLoading ? 'Checking accounts...' : 'Loading replies...'}
           </div>
         </CardContent>
       </Card>
@@ -127,14 +146,16 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
               Recent Replies
             </CardTitle>
             <CardDescription>
-              {replies.length === 0 
-                ? `${replies.length} replies found`
-                : `${replies.length} replies found`
+              {!hasConnectedAccounts 
+                ? 'Connect an account to see replies'
+                : replies.length === 0 
+                  ? 'No replies found'
+                  : `${replies.length} replies found`
               }
             </CardDescription>
           </div>
           
-          {onRefresh && (
+          {onRefresh && hasConnectedAccounts && (
             <div className="flex items-center gap-3">
               {timeUntilNextPoll && 
                !timeUntilNextPoll.includes('Connect account') && 
@@ -157,7 +178,13 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
         </div>
       </CardHeader>
       <CardContent>
-        {replies.length === 0 ? (
+        {!hasConnectedAccounts ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No account connected</p>
+            <p className="text-sm">Connect your X account to start monitoring replies</p>
+          </div>
+        ) : replies.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No replies yet</p>
