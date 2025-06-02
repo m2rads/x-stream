@@ -1,54 +1,54 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+// import { useState, useEffect } from 'react'
+// import { Button } from '@/components/ui/button'
+// import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Play, Square, RotateCcw } from 'lucide-react'
+// import { Play, Square, RotateCcw } from 'lucide-react'
 
 interface PollControlsProps {
   onRepliesUpdate: () => void
 }
 
 export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
-  const [isMonitoring, setIsMonitoring] = useState(false)
-  const [lastPollTime, setLastPollTime] = useState<Date | null>(null)
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
-  const [totalReplies, setTotalReplies] = useState(0)
+  // const [isMonitoring, setIsMonitoring] = useState(false)
+  // const [lastPollTime, setLastPollTime] = useState<Date | null>(null)
+  // const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
+  // const [totalReplies, setTotalReplies] = useState(0)
 
-  const POLL_INTERVAL_MS = 30000 // Poll every 30 seconds
+  // const POLL_INTERVAL_MS = 30000 
 
-  const startMonitoring = async () => {
-    try {
-      setIsMonitoring(true)
-      await performPoll()
+  // const startMonitoring = async () => {
+  //   try {
+  //     // setIsMonitoring(true)
+  //     await performPoll()
       
-      const interval = setInterval(async () => {
-        await performPoll()
-      }, POLL_INTERVAL_MS)
+  //     const interval = setInterval(async () => {
+  //       await performPoll()
+  //     }, POLL_INTERVAL_MS)
       
-      setPollInterval(interval)
-      toast.success('Started monitoring for replies')
+  //     setPollInterval(interval)
+  //     toast.success('Started monitoring for replies')
       
-    } catch (error) {
-      console.error('Failed to start monitoring:', error)
-      toast.error('Failed to start monitoring')
-      setIsMonitoring(false)
-    }
-  }
+  //   } catch (error) {
+  //     console.error('Failed to start monitoring:', error)
+  //     toast.error('Failed to start monitoring')
+  //     // setIsMonitoring(false)
+  //   }
+  // }
 
-  const stopMonitoring = () => {
-    if (pollInterval) {
-      clearInterval(pollInterval)
-      setPollInterval(null)
-    }
-    setIsMonitoring(false)
-    toast.info('Stopped monitoring')
-  }
+  // const stopMonitoring = () => {
+  //   if (pollInterval) {
+  //     clearInterval(pollInterval)
+  //     setPollInterval(null)
+  //   }
+  //   setIsMonitoring(false)
+  //   toast.info('Stopped monitoring')
+  // }
 
   const performPoll = async () => {
     try {
-      setLastPollTime(new Date())
+      // setLastPollTime(new Date())
       
       const response = await fetch('/api/stream/poll', {
         method: 'POST',
@@ -61,7 +61,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       const data = await response.json()
 
       if (data.totalNewReplies > 0) {
-        setTotalReplies(prev => prev + data.totalNewReplies)
+        // setTotalReplies(prev => prev + data.totalNewReplies)
         toast.success(`Found ${data.totalNewReplies} new replies!`)
         onRepliesUpdate()
       }
@@ -78,13 +78,13 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     // }
   }
 
-  useEffect(() => {
-    return () => {
-      if (pollInterval) {
-        clearInterval(pollInterval)
-      }
-    }
-  }, [pollInterval])
+  // useEffect(() => {
+  //   return () => {
+  //     if (pollInterval) {
+  //       clearInterval(pollInterval)
+  //     }
+  //   }
+  // }, [pollInterval])
 
   // Export the manual poll function for use in other components
   return { manualPoll }

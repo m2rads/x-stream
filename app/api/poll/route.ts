@@ -73,7 +73,7 @@ export async function POST() {
         // Process and store new replies
         for (const tweet of tweets) {
           // Find the author info
-          const author = users.find((user: any) => user.id === tweet.author_id)
+          const author = users.find((user: { id: string }) => user.id === tweet.author_id)
           
           // Encrypt the tweet text
           const encryptedText = encryptText(tweet.text)
