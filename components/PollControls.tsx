@@ -24,16 +24,15 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       if (autoPollInterval) clearInterval(autoPollInterval)
       if (countdownInterval) clearInterval(countdownInterval)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getRateLimitEndTime = () => {
     const lastRateLimit = localStorage.getItem('lastRateLimit')
     if (!lastRateLimit) return null
     
     const rateLimitTime = new Date(lastRateLimit)
-    const endTime = new Date(rateLimitTime.getTime() + 15 * 60 * 1000) // 15 minutes later
+    const endTime = new Date(rateLimitTime.getTime() + 15 * 60 * 1000)
     
-    // Check if rate limit period has expired
     if (endTime.getTime() <= Date.now()) {
       localStorage.removeItem('lastRateLimit')
       return null
@@ -56,12 +55,10 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   }
 
   const startAutoPoll = () => {
-    // First, check if we're in a rate limit period
     const rateLimitEndTime = getRateLimitEndTime()
     let nextPollTime: Date
 
     if (rateLimitEndTime) {
-      // If we're rate limited, next poll should be when rate limit expires
       nextPollTime = rateLimitEndTime
       console.log('Rate limit active, next poll at:', nextPollTime)
     } else {
@@ -73,11 +70,9 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
     setNextPollTime(nextPollTime)
 
-    // Clear any existing intervals
     if (autoPollInterval) clearInterval(autoPollInterval)
     if (countdownInterval) clearInterval(countdownInterval)
 
-    // Calculate how long until the next poll
     const timeUntilPoll = nextPollTime.getTime() - Date.now()
 
     // Set up the auto-poll timer
@@ -91,18 +86,15 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     }, timeUntilPoll)
 
     // Store the timeout as an interval for cleanup
-    setAutoPollInterval(pollTimeout as any)
+    setAutoPollInterval(pollTimeout)
 
-    // Start countdown update interval (every second)
     const countdown = setInterval(updateCountdown, 1000)
     setCountdownInterval(countdown)
     
-    // Update countdown immediately
     updateCountdown()
   }
 
   const updateCountdown = () => {
-    // First check if we're in a rate limit period (same logic as toast)
     const rateLimitTime = getRateLimitTimeRemaining()
     if (rateLimitTime) {
       setTimeUntilNextPoll(rateLimitTime)
@@ -111,7 +103,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
     // If no rate limit, use the regular nextPollTime
     if (!nextPollTime) {
-      setTimeUntilNextPoll('15:00') // Default to 15 minutes
+      setTimeUntilNextPoll('15:00')
       return
     }
 
@@ -149,13 +141,11 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       })
 
       if (!response.ok) {
-        // Handle specific error cases
         if (response.status === 429) {
           // Store the rate limit time
           localStorage.setItem('lastRateLimit', new Date().toISOString())
           showRateLimitToast()
           
-          // Restart auto-poll to sync with rate limit
           startAutoPoll()
           return
         } else if (response.status >= 500) {
@@ -180,7 +170,6 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
         toast.info('No new replies found')
       }
 
-      // After successful poll, set next poll time to 15 minutes from now
       const nextTime = new Date()
       nextTime.setMinutes(nextTime.getMinutes() + 15)
       setNextPollTime(nextTime)
@@ -194,7 +183,6 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
   }
 
   const manualPoll = async () => {
-    // Check if we're still in rate limit period
     const timeRemaining = getRateLimitTimeRemaining()
     if (timeRemaining) {
       showRateLimitToast()
@@ -203,11 +191,9 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     
     await performPoll()
     
-    // Restart auto-poll timer after manual poll
     startAutoPoll()
   }
 
-  // Export the manual poll function and countdown for use in other components
   return { manualPoll, timeUntilNextPoll }
 
   // Commented out UI - keeping for later use
