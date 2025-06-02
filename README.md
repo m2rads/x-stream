@@ -2,6 +2,15 @@
 
 Monitor replies to your X (Twitter) posts with OAuth 2.0 authentication and real-time polling.
 
+# Features
+
+- **OAuth 2.0 PKCE Authentication** - Secure X account connection
+- **Reply Monitoring** - Tracks replies to your posts
+- **Rate Limit Handling** - Respects X API limits (1 request/15min)
+- **Auto Polling** - Checks for new replies every 15 minutes
+- **Privacy Focused** - Complete data deletion on disconnect
+- **Real-time UI** - Live countdown and status updates
+
 ## Quick Setup
 
 ### 1. Prerequisites
@@ -90,15 +99,6 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000)
-
-## Features
-
-- **OAuth 2.0 PKCE Authentication** - Secure X account connection
-- **Reply Monitoring** - Tracks replies to your posts
-- **Rate Limit Handling** - Respects X API limits (1 request/15min)
-- **Auto Polling** - Checks for new replies every 15 minutes
-- **Privacy Focused** - Complete data deletion on disconnect
-- **Real-time UI** - Live countdown and status updates
 
 ## Usage
 
