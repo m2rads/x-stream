@@ -194,7 +194,37 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       return
     }
 
-    // If no rate limit, use the regular nextPollTime
+    // If rate limit just expired and we still have an old nextPollTime, clear it
+    const rateLimitEndTime = getRateLimitEndTime()
+    if (!rateLimitEndTime && nextPollTime) {
+      const now = new Date()
+      // If nextPollTime was based on rate limit and limit is now expired
+      if (nextPollTime.getTime() <= now.getTime()) {
+        console.log('Rate limit expired, starting new 15-minute countdown')
+        // Start a fresh countdown
+        const newNextPollTime = new Date(now.getTime() + 15 * 60 * 1000)
+        setNextPollTime(newNextPollTime)
+        
+        // Clear existing intervals and start fresh
+        if (autoPollInterval) clearInterval(autoPollInterval)
+        if (countdownInterval) clearInterval(countdownInterval)
+        
+        // Set up new poll timer
+        const timeUntilPoll = newNextPollTime.getTime() - now.getTime()
+        const pollTimeout = setTimeout(() => {
+          performPoll().then(() => {
+            setPollCompleted(prev => prev + 1)
+          })
+        }, timeUntilPoll)
+        setAutoPollInterval(pollTimeout)
+        
+        // Restart countdown interval
+        const countdown = setInterval(updateCountdown, 1000)
+        setCountdownInterval(countdown)
+      }
+    }
+
+    // If no nextPollTime set, default to 15:00
     if (!nextPollTime) {
       console.log('No nextPollTime set, defaulting to 15:00')
       setTimeUntilNextPoll('15:00')
