@@ -95,6 +95,17 @@ export function useXAccounts(): UseXAccountsReturn {
 
       // Refresh accounts list
       await fetchAccounts()
+      
+      // Check if user still has accounts - if not, they've been logged out
+      const accountsResponse = await fetch('/api/accounts')
+      if (accountsResponse.status === 401) {
+        // User has been logged out (no remaining accounts)
+        toast.success('Account disconnected and logged out successfully')
+        // Refresh the page to reset the app state
+        window.location.href = '/'
+        return
+      }
+      
       toast.success(SUCCESS_MESSAGES.ACCOUNT_DISCONNECTED)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : ERROR_MESSAGES.DISCONNECT_FAILED

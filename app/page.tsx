@@ -5,12 +5,10 @@ import XConnectionCard from '@/components/XConnectionCard'
 import PollControls from '@/components/PollControls'
 import RepliesList from '@/components/RepliesList'
 import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
-import { LogOut, User } from 'lucide-react'
 
 export default function Home() {
   const [repliesKey, setRepliesKey] = useState(0)
-  const { user, loading, logout } = useAuth()
+  const { user, loading } = useAuth()
 
   const handleRepliesUpdate = () => {
     setRepliesKey(prev => prev + 1)
@@ -41,36 +39,16 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header with user info and logout */}
-        <div className="flex items-center justify-between">
-          <div className="text-center flex-1">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
-              Monitor <span className="inline-block"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                </svg></span> Replies
-            </h1>
-            <p className="text-muted-foreground">
-              {user ? `Welcome back, @${user.x_username}` : 'Connect your X account to start monitoring replies'}
-            </p>
-          </div>
-          
-          {user && (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="w-4 h-4" />
-                <span>@{user.x_username}</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={logout}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </Button>
-            </div>
-          )}
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            Monitor <span className="inline-block"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg></span> Replies
+          </h1>
+          <p className="text-muted-foreground">
+            {user ? `Welcome back, @${user.x_username}` : 'Connect your X account to start monitoring replies'}
+          </p>
         </div>
         
         <XConnectionCard 
