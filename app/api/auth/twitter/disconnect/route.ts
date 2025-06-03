@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser(request)
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     const { accountId } = await request.json()
 
     if (!accountId) {
@@ -14,21 +24,22 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = createSupabaseAdmin()
 
-    // First, get the account details to find the x_username
+    // First, verify that this account belongs to the current user
     const { data: account, error: accountError } = await supabaseAdmin
       .from('x_accounts')
       .select('x_username, x_user_id')
       .eq('id', accountId)
+      .eq('x_user_id', currentUser.x_user_id) // Only allow users to disconnect their own accounts
       .single()
 
     if (accountError || !account) {
       return NextResponse.json(
-        { error: 'Account not found' },
+        { error: 'Account not found or not authorized' },
         { status: 404 }
       )
     }
 
-    console.log(`Disconnecting account: ${account.x_username}`)
+    console.log(`User @${currentUser.x_username} disconnecting account: @${account.x_username}`)
 
     // Delete all tweets that are replies TO this account (where this account is the target)
     const { error: repliesError, count: repliesCount } = await supabaseAdmin
@@ -59,6 +70,7 @@ export async function POST(request: NextRequest) {
       .from('x_accounts')
       .delete()
       .eq('id', accountId)
+      .eq('x_user_id', currentUser.x_user_id) // Double-check user ownership
 
     if (deleteError) {
       console.error('Error deleting account:', deleteError)
@@ -68,14 +80,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const totalDeleted = (repliesCount || 0) + (authoredCount || 0)
-    console.log(`Account @${account.x_username} disconnected successfully. Deleted ${totalDeleted} total tweets.`)
+    // If this was the user's only account, also delete their session
+    const { data: remainingAccounts } = await supabaseAdmin
+      .from('x_accounts')
+      .select('id')
+      .eq('x_user_id', currentUser.x_user_id)
+      .eq('is_connected', true)
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Account disconnected and all data removed successfully. Deleted ${totalDeleted} tweets.`
+    if (!remainingAccounts || remainingAccounts.length === 0) {
+      // Delete all sessions for this user
+      await supabaseAdmin
+        .from('user_sessions')
+        .delete()
+        .eq('x_user_id', currentUser.x_user_id)
+      
+      console.log(`Deleted all sessions for user @${currentUser.x_username} (no accounts remaining)`)
+    }
+
+    console.log(`Successfully disconnected account @${account.x_username} for user @${currentUser.x_username}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Account disconnected successfully'
     })
-
   } catch (error) {
     console.error('Disconnect error:', error)
     return NextResponse.json(

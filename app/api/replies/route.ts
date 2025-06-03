@@ -1,42 +1,25 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
+import { getCurrentUser } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabaseAdmin = createSupabaseAdmin()
+    const currentUser = await getCurrentUser(request)
     
-    // First, get the list of connected account usernames
-    const { data: connectedAccounts, error: accountsError } = await supabaseAdmin
-      .from('x_accounts')
-      .select('x_username')
-      .eq('is_connected', true)
-
-    if (accountsError) {
-      console.error('Database error fetching accounts:', accountsError)
+    if (!currentUser) {
       return NextResponse.json(
-        { error: 'Failed to fetch connected accounts' },
-        { status: 500 }
+        { error: 'Authentication required' },
+        { status: 401 }
       )
     }
 
-    // If no connected accounts, return empty
-    if (!connectedAccounts || connectedAccounts.length === 0) {
-      return NextResponse.json({
-        success: true,
-        replies: [],
-        count: 0,
-        message: 'No connected accounts found'
-      })
-    }
-
-    // Get usernames array
-    const connectedUsernames = connectedAccounts.map(acc => acc.x_username)
+    const supabaseAdmin = createSupabaseAdmin()
     
-    // Get replies only for connected accounts
+    // Get replies only for the current user (using the target_user_id we now store in metadata)
     const { data: replies, error } = await supabaseAdmin
       .from('x_tweets')
       .select('*')
-      .in('metadata->>target_username', connectedUsernames)
+      .eq('metadata->>target_user_id', currentUser.x_user_id)
       .order('created_at', { ascending: false })
       .limit(50)
 
@@ -48,33 +31,28 @@ export async function GET() {
       )
     }
 
-    // Transform the data to match the expected format
-    const transformedReplies = (replies || []).map(reply => {
-      return {
-        id: reply.id,
-        tweet_id: reply.x_tweet_id,
-        text: reply.encrypted_text || '[No text]',
-        author_id: reply.x_author_id,
-        author_username: reply.x_author_username,
-        target_username: reply.metadata?.target_username || 'unknown',
-        conversation_id: reply.metadata?.conversation_id,
-        in_reply_to_user_id: reply.in_reply_to_tweet_id,
-        tweet_created_at: reply.metadata?.tweet_created_at || reply.created_at,
-        created_at: reply.created_at,
-        status: reply.status
-      }
-    })
+    // Transform the data for the frontend
+    const transformedReplies = (replies || []).map(reply => ({
+      id: reply.id,
+      tweet_id: reply.x_tweet_id,
+      text: reply.encrypted_text,
+      author_username: reply.x_author_username,
+      target_username: reply.metadata?.target_username || 'unknown',
+      tweet_created_at: reply.metadata?.tweet_created_at || reply.created_at,
+      created_at: reply.created_at
+    }))
 
     return NextResponse.json({
       success: true,
       replies: transformedReplies,
-      count: transformedReplies.length
+      count: transformedReplies.length,
+      user: currentUser.x_username
     })
 
   } catch (error) {
     console.error('Error fetching replies:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch replies' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

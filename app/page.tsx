@@ -4,9 +4,13 @@ import { useState } from 'react'
 import XConnectionCard from '@/components/XConnectionCard'
 import PollControls from '@/components/PollControls'
 import RepliesList from '@/components/RepliesList'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/ui/button'
+import { LogOut, User } from 'lucide-react'
 
 export default function Home() {
   const [repliesKey, setRepliesKey] = useState(0)
+  const { user, loading, logout } = useAuth()
 
   const handleRepliesUpdate = () => {
     setRepliesKey(prev => prev + 1)
@@ -21,18 +25,52 @@ export default function Home() {
     setRepliesKey(prev => prev + 1)
   }
 
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
-            Monitor <span className="inline-block"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg></span> Replies
-          </h1>
-          <p className="text-muted-foreground">
-            Connect your X account to start monitoring replies
-          </p>
+        {/* Header with user info and logout */}
+        <div className="flex items-center justify-between">
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">
+              Monitor <span className="inline-block"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg></span> Replies
+            </h1>
+            <p className="text-muted-foreground">
+              {user ? `Welcome back, @${user.x_username}` : 'Connect your X account to start monitoring replies'}
+            </p>
+          </div>
+          
+          {user && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span>@{user.x_username}</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={logout}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </Button>
+            </div>
+          )}
         </div>
         
         <XConnectionCard 
@@ -40,11 +78,13 @@ export default function Home() {
           onAccountDisconnected={handleAccountDisconnected} 
         />
         
-        <RepliesList 
-          key={repliesKey} 
-          onRefresh={manualPoll} 
-          timeUntilNextPoll={timeUntilNextPoll}
-        />
+        {user && (
+          <RepliesList 
+            key={repliesKey} 
+            onRefresh={manualPoll} 
+            timeUntilNextPoll={timeUntilNextPoll}
+          />
+        )}
       </div>
     </main>
   )

@@ -1,14 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
-import { decryptToken } from '@/lib/encryption'
+import { getCurrentUser } from '@/lib/auth'
+import { getValidAccessToken } from '@/lib/token-refresh'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser(request)
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     const supabaseAdmin = createSupabaseAdmin()
     
+    // Get only the current user's accounts
     const { data: accounts } = await supabaseAdmin
       .from('x_accounts')
-      .select('x_username, encrypted_access_token_id')
+      .select('x_username, x_user_id, encrypted_access_token_id')
+      .eq('x_user_id', currentUser.x_user_id)
       .eq('is_connected', true)
 
     if (!accounts || accounts.length === 0) {
@@ -22,13 +34,23 @@ export async function POST() {
 
     for (const account of accounts) {
       try {
-        const accessToken = decryptToken(account.encrypted_access_token_id!)
+        const accessToken = await getValidAccessToken(account.x_user_id)
+        
+        if (!accessToken) {
+          console.error(`Failed to get valid access token for @${account.x_username}`)
+          results.push({
+            username: account.x_username,
+            success: false,
+            error: 'Authentication failed - please reconnect your account'
+          })
+          continue
+        }
         
         // Get the most recent tweet we've stored for this account to avoid duplicates
         const { data: lastTweet } = await supabaseAdmin
           .from('x_tweets')
           .select('x_tweet_id')
-          .eq('x_author_username', account.x_username)
+          .eq('metadata->>target_username', account.x_username)
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -46,7 +68,7 @@ export async function POST() {
           url.searchParams.set('since_id', lastTweet[0].x_tweet_id)
         }
 
-        console.log(`Searching for replies to @${account.x_username}:`, url.toString())
+        console.log(`Searching for replies to @${account.x_username} (user: @${currentUser.x_username}):`, url.toString())
 
         const response = await fetch(url.toString(), {
           headers: {
@@ -56,7 +78,7 @@ export async function POST() {
 
         // === LOG COMPLETE X API RESPONSE ===
         console.log('='.repeat(50))
-        console.log(`X API Response for @${account.x_username}`)
+        console.log(`X API Response for @${account.x_username} (user: @${currentUser.x_username})`)
         console.log('='.repeat(50))
         console.log('Status:', response.status)
         console.log('Status Text:', response.statusText)
@@ -108,7 +130,7 @@ export async function POST() {
           const errorText = await response.text()
           console.error(`Failed to search replies for @${account.x_username}:`, errorText)
           
-          // Check for rate limit
+          // Check for rate limit with detailed handling
           if (response.status === 429) {
             rateLimitHit = true
             // Capture the precise reset time from X API
@@ -128,11 +150,23 @@ export async function POST() {
         }
 
         const data = await response.json()
-        const tweets = data.data || []
+        
+        if (!data.data || data.data.length === 0) {
+          console.log(`No new replies found for @${account.x_username}`)
+          results.push({
+            username: account.x_username,
+            success: true,
+            newReplies: 0
+          })
+          continue
+        }
+
+        const tweets = data.data
         const users = data.includes?.users || []
 
         console.log(`Found ${tweets.length} new replies for @${account.x_username}`)
 
+        // Store each tweet
         for (const tweet of tweets) {
           const author = users.find((user: { id: string }) => user.id === tweet.author_id)
           
@@ -145,6 +179,7 @@ export async function POST() {
             status: 'open' as const,
             metadata: {
               target_username: account.x_username,
+              target_user_id: currentUser.x_user_id, // Associate with the current user
               conversation_id: tweet.conversation_id,
               tweet_created_at: tweet.created_at,
               raw_data: tweet
@@ -193,6 +228,8 @@ export async function POST() {
       }, { status: 429 })
     }
 
+    console.log(`Poll completed for user @${currentUser.x_username}. Total new replies: ${totalNewReplies}`)
+
     return NextResponse.json({
       success: true,
       totalNewReplies,
@@ -201,9 +238,9 @@ export async function POST() {
     })
 
   } catch (error) {
-    console.error('Polling error:', error)
+    console.error('Poll error:', error)
     return NextResponse.json(
-      { error: `Polling failed: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

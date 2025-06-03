@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { encryptToken } from '@/lib/encryption'
+import { generateRandomString } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -100,10 +101,14 @@ export async function GET(request: NextRequest) {
     const encryptedAccessToken = encryptToken(access_token)
     const encryptedRefreshToken = refresh_token ? encryptToken(refresh_token) : null
 
+    // Generate session token
+    const sessionToken = generateRandomString(64)
+    const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
     // Create admin client for server-side database operations
     const supabaseAdmin = createSupabaseAdmin()
 
-    // Store/update account in database
+    // Store/update account in database with session token
     const { error: dbError } = await supabaseAdmin
       .from('x_accounts')
       .upsert(
@@ -115,6 +120,7 @@ export async function GET(request: NextRequest) {
           encrypted_access_token_id: encryptedAccessToken,
           encrypted_refresh_token_id: encryptedRefreshToken,
           token_expires_at: tokenExpiresAt,
+          session_token: sessionToken,
           updated_at: new Date().toISOString(),
         },
         {
@@ -127,15 +133,44 @@ export async function GET(request: NextRequest) {
       throw new Error('Failed to store account data')
     }
 
-    console.log('Account stored successfully in database')
+    // Create user session
+    const { error: sessionError } = await supabaseAdmin
+      .from('user_sessions')
+      .upsert(
+        {
+          x_user_id,
+          x_username,
+          session_token: sessionToken,
+          expires_at: sessionExpiresAt.toISOString(),
+        },
+        {
+          onConflict: 'session_token',
+        }
+      )
 
-    // Clear OAuth cookies
+    if (sessionError) {
+      console.error('Session creation error:', sessionError)
+      throw new Error('Failed to create user session')
+    }
+
+    console.log('Account and session stored successfully in database')
+
+    // Clear OAuth cookies and set session cookie
     const response = NextResponse.redirect(
       new URL('/?connected=true', request.url)
     )
     
     response.cookies.delete('oauth_code_verifier')
     response.cookies.delete('oauth_state')
+
+    // Set session cookie
+    response.cookies.set('session_token', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/',
+    })
 
     return response
   } catch (error) {

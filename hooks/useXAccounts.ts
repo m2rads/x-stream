@@ -40,14 +40,22 @@ export function useXAccounts(): UseXAccountsReturn {
   const fetchAccounts = useCallback(async () => {
     try {
       setError(null)
-      const { data, error: fetchError } = await supabase
-        .from('x_accounts')
-        .select('*')
-        .eq('is_connected', true)
-        .order('connected_at', { ascending: false })
-
-      if (fetchError) throw new Error(fetchError.message)
-      setAccounts(data || [])
+      
+      // Fetch user's accounts via API (which will check session)
+      const response = await fetch('/api/accounts')
+      
+      if (response.status === 401) {
+        // Not authenticated, clear accounts
+        setAccounts([])
+        return
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch accounts')
+      }
+      
+      const data = await response.json()
+      setAccounts(data.accounts || [])
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : ERROR_MESSAGES.FETCH_ACCOUNTS_FAILED
       setError(errorMessage)
