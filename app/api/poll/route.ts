@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
         // Search for replies to this user (using free tier search API)
         const searchQuery = `to:${account.x_username}`
-        const url = new URL('https://api.twitter.com/2/tweets/search/recent')
+        const url = new URL('https://api.x.com/2/tweets/search/recent')
         url.searchParams.set('query', searchQuery)
         url.searchParams.set('max_results', '10')
         url.searchParams.set('tweet.fields', 'created_at,author_id,conversation_id,in_reply_to_user_id')

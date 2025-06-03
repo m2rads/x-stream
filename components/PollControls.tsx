@@ -140,6 +140,16 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
         localStorage.removeItem('lastRateLimit')
       }
     }
+
+    // Clear any existing intervals first
+    if (autoPollInterval) {
+      clearInterval(autoPollInterval)
+      setAutoPollInterval(null)
+    }
+    if (countdownInterval) {
+      clearInterval(countdownInterval)
+      setCountdownInterval(null)
+    }
     
     // First, check if we're in a rate limit period
     const rateLimitEndTime = getRateLimitEndTime()
@@ -158,10 +168,6 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
 
     setNextPollTime(nextPollTime)
 
-    // Clear any existing intervals
-    if (autoPollInterval) clearInterval(autoPollInterval)
-    if (countdownInterval) clearInterval(countdownInterval)
-
     // Calculate how long until the next poll
     const timeUntilPoll = nextPollTime.getTime() - Date.now()
     console.log('Time until next poll (ms):', timeUntilPoll)
@@ -177,7 +183,7 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
     // Store the timeout as an interval for cleanup
     setAutoPollInterval(pollTimeout)
 
-    // Start countdown update interval (every second)
+    // Start countdown update interval (every second) - only if we don't already have one
     const countdown = setInterval(updateCountdown, 1000)
     setCountdownInterval(countdown)
     
@@ -200,16 +206,23 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
       const now = new Date()
       // If nextPollTime was based on rate limit and limit is now expired
       if (nextPollTime.getTime() <= now.getTime()) {
-        console.log('Rate limit expired, starting new 15-minute countdown')
-        // Start a fresh countdown
+        console.log('Rate limit expired, restarting countdown...')
+        
+        // Clear existing intervals to prevent multiple timers
+        if (autoPollInterval) {
+          clearInterval(autoPollInterval)
+          setAutoPollInterval(null)
+        }
+        if (countdownInterval) {
+          clearInterval(countdownInterval)
+          setCountdownInterval(null)
+        }
+        
+        // Set up fresh 15-minute countdown
         const newNextPollTime = new Date(now.getTime() + 15 * 60 * 1000)
         setNextPollTime(newNextPollTime)
         
-        // Clear existing intervals and start fresh
-        if (autoPollInterval) clearInterval(autoPollInterval)
-        if (countdownInterval) clearInterval(countdownInterval)
-        
-        // Set up new poll timer
+        // Schedule new poll
         const timeUntilPoll = newNextPollTime.getTime() - now.getTime()
         const pollTimeout = setTimeout(() => {
           performPoll().then(() => {
@@ -218,9 +231,8 @@ export default function PollControls({ onRepliesUpdate }: PollControlsProps) {
         }, timeUntilPoll)
         setAutoPollInterval(pollTimeout)
         
-        // Restart countdown interval
-        const countdown = setInterval(updateCountdown, 1000)
-        setCountdownInterval(countdown)
+        // DON'T restart countdown interval here - let the effect handle it
+        return
       }
     }
 

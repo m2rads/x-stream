@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     console.log('Code verifier found, proceeding with token exchange')
 
     // Exchange authorization code for access token
-    const tokenResponse = await fetch('https://api.twitter.com/2/oauth2/token', {
+    const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     console.log('Token exchange successful, fetching user info')
 
     // Get user info from X API
-    const userResponse = await fetch('https://api.twitter.com/2/users/me', {
+    const userResponse = await fetch('https://api.x.com/2/users/me', {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
