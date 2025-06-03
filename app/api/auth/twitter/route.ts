@@ -1,54 +1,84 @@
 import { NextResponse } from 'next/server'
-import { generateRandomString, generateCodeChallenge, generateState } from '@/lib/utils'
+import { createHash, createHmac } from 'crypto'
 
 export async function GET() {
   try {
-    // Generate PKCE parameters
-    const codeVerifier = generateRandomString(128)
-    const codeChallenge = await generateCodeChallenge(codeVerifier)
-    const state = generateState()
-
-    console.log('Generated OAuth parameters:', {
-      codeVerifier: codeVerifier.substring(0, 10) + '...',
-      codeChallenge: codeChallenge.substring(0, 10) + '...',
-      state: state
-    })
-
-    // Create authorization URL
-    const authUrl = `https://twitter.com/i/oauth2/authorize?` +
-      new URLSearchParams({
-        response_type: 'code',
-        client_id: process.env.TWITTER_CLIENT_ID!,
-        redirect_uri: process.env.TWITTER_REDIRECT_URI!,
-        scope: 'tweet.read tweet.write users.read offline.access',
-        state: state,
-        code_challenge: codeChallenge,
-        code_challenge_method: 'S256',
-      }).toString()
-
-    console.log('Authorization URL created, redirecting to X')
-
-    // Store PKCE parameters in session/cookies for later verification
-    const response = NextResponse.redirect(authUrl)
-
-    // Store PKCE parameters in httpOnly cookies for security
-    // Using more lenient cookie settings for development
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-      maxAge: 600, // 10 minutes
-      path: '/', // Ensure cookies are available for all paths
+    // OAuth 1.0a Step 1: Get request token
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const nonce = Math.random().toString(36).substring(2, 15)
+    const callbackUrl = process.env.TWITTER_REDIRECT_URI!
+    
+    // OAuth 1.0a parameters
+    const oauthParams = {
+      oauth_callback: callbackUrl,
+      oauth_consumer_key: process.env.TWITTER_API_KEY!,
+      oauth_nonce: nonce,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_version: '1.0'
     }
 
-    response.cookies.set('oauth_code_verifier', codeVerifier, cookieOptions)
-    response.cookies.set('oauth_state', state, cookieOptions)
+    // Create signature base string
+    const paramString = Object.entries(oauthParams)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    
+    const signatureBase = `POST&${encodeURIComponent('https://api.x.com/oauth/request_token')}&${encodeURIComponent(paramString)}`
+    const signingKey = `${encodeURIComponent(process.env.TWITTER_API_SECRET!)}&`
+    const signature = createHmac('sha1', signingKey).update(signatureBase).digest('base64')
 
-    console.log('Cookies set, redirecting user to X authorization')
+    // Create Authorization header
+    const authHeader = 'OAuth ' + Object.entries({
+      ...oauthParams,
+      oauth_signature: signature
+    }).map(([key, value]) => `${key}="${encodeURIComponent(value)}"`).join(', ')
 
-    return response
+    console.log('Making OAuth 1.0a request token request')
+
+    // Request the request token
+    const response = await fetch('https://api.x.com/oauth/request_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Request token failed:', errorText)
+      throw new Error(`Request token failed: ${errorText}`)
+    }
+
+    const responseText = await response.text()
+    const params = new URLSearchParams(responseText)
+    const oauthToken = params.get('oauth_token')
+    const oauthTokenSecret = params.get('oauth_token_secret')
+
+    if (!oauthToken || !oauthTokenSecret) {
+      throw new Error('Invalid response from request token endpoint')
+    }
+
+    console.log('Request token obtained, redirecting to authenticate')
+
+    // Redirect to OAuth 1.0a authenticate endpoint
+    const authUrl = `https://api.x.com/oauth/authenticate?oauth_token=${oauthToken}&force_login=true`
+    
+    const redirectResponse = NextResponse.redirect(authUrl)
+    
+    // Store token secret for later use
+    redirectResponse.cookies.set('oauth_token_secret', oauthTokenSecret, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutes
+      path: '/',
+    })
+
+    return redirectResponse
   } catch (error) {
-    console.error('OAuth initiation error:', error)
+    console.error('OAuth 1.0a initiation error:', error)
     return NextResponse.json(
       { error: 'Failed to initiate OAuth flow' },
       { status: 500 }

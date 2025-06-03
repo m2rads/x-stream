@@ -2,168 +2,251 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase'
 import { encryptToken } from '@/lib/encryption'
 import { generateRandomString } from '@/lib/utils'
+import { createHmac } from 'crypto'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  const state = searchParams.get('state')
-  const error = searchParams.get('error')
+  const oauthToken = searchParams.get('oauth_token')
+  const oauthVerifier = searchParams.get('oauth_verifier')
+  const denied = searchParams.get('denied')
 
-  // Handle OAuth errors
-  if (error) {
-    console.error('OAuth error:', error)
-    return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(error)}`, request.url)
-    )
+  console.log('=== OAuth 1.0a Callback Debug Info ===')
+  console.log('Timestamp:', new Date().toISOString())
+  console.log('oauth_token present:', !!oauthToken)
+  console.log('oauth_verifier present:', !!oauthVerifier)
+  console.log('denied present:', !!denied)
+
+  // Handle user denial
+  if (denied) {
+    console.log('User denied authorization')
+    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=access_denied`)
   }
 
-  if (!code || !state) {
-    return NextResponse.redirect(
-      new URL('/?error=missing_parameters', request.url)
-    )
+  // Validate required parameters
+  if (!oauthToken || !oauthVerifier) {
+    console.error('Missing OAuth 1.0a parameters')
+    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=invalid_request`)
+  }
+
+  // Get stored token secret from cookies
+  const oauthTokenSecret = request.cookies.get('oauth_token_secret')?.value
+
+  if (!oauthTokenSecret) {
+    console.error('Missing OAuth token secret')
+    return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/?error=invalid_state`)
   }
 
   try {
-    // Verify state parameter (handle URL encoding)
-    const storedState = request.cookies.get('oauth_state')?.value
-    const decodedState = decodeURIComponent(state)
-    
-    console.log('Stored state:', storedState)
-    console.log('Received state:', state)
-    console.log('Decoded state:', decodedState)
-    
-    if (!storedState) {
-      throw new Error('Missing stored state parameter - cookies may have expired')
-    }
-    
-    if (storedState !== state && storedState !== decodedState) {
-      throw new Error(`Invalid state parameter. Expected: ${storedState}, Received: ${state}, Decoded: ${decodedState}`)
-    }
+    console.log('Exchanging OAuth 1.0a verifier for access token')
 
-    // Get code verifier from cookies
-    const codeVerifier = request.cookies.get('oauth_code_verifier')?.value
-    if (!codeVerifier) {
-      throw new Error('Missing code verifier - cookies may have expired')
+    // OAuth 1.0a Step 3: Exchange verifier for access token
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const nonce = Math.random().toString(36).substring(2, 15)
+    
+    const oauthParams = {
+      oauth_consumer_key: process.env.TWITTER_API_KEY!,
+      oauth_nonce: nonce,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: timestamp,
+      oauth_token: oauthToken,
+      oauth_verifier: oauthVerifier,
+      oauth_version: '1.0'
     }
 
-    console.log('Code verifier found, proceeding with token exchange')
+    // Create signature base string
+    const paramString = Object.entries(oauthParams)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    
+    const signatureBase = `POST&${encodeURIComponent('https://api.x.com/oauth/access_token')}&${encodeURIComponent(paramString)}`
+    const signingKey = `${encodeURIComponent(process.env.TWITTER_API_SECRET!)}&${encodeURIComponent(oauthTokenSecret)}`
+    const signature = createHmac('sha1', signingKey).update(signatureBase).digest('base64')
 
-    // Exchange authorization code for access token
-    const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
+    // Create Authorization header
+    const authHeader = 'OAuth ' + Object.entries({
+      ...oauthParams,
+      oauth_signature: signature
+    }).map(([key, value]) => `${key}="${encodeURIComponent(value)}"`).join(', ')
+
+    // Exchange for access token
+    const tokenResponse = await fetch('https://api.x.com/oauth/access_token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(
-          `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
-        ).toString('base64')}`,
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: process.env.TWITTER_REDIRECT_URI!,
-        code_verifier: codeVerifier,
-      }),
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
     })
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text()
-      console.error('Token exchange failed:', errorData)
-      throw new Error(`Token exchange failed: ${errorData}`)
+      console.error('Access token exchange failed:', errorData)
+      throw new Error(`Access token exchange failed: ${errorData}`)
     }
 
-    const tokens = await tokenResponse.json()
-    const { access_token, refresh_token, expires_in } = tokens
+    const tokenResponseText = await tokenResponse.text()
+    const tokenParams = new URLSearchParams(tokenResponseText)
+    
+    const accessToken = tokenParams.get('oauth_token')
+    const accessTokenSecret = tokenParams.get('oauth_token_secret')
+    const userId = tokenParams.get('user_id')
+    const screenName = tokenParams.get('screen_name')
 
-    console.log('Token exchange successful, fetching user info')
+    if (!accessToken || !accessTokenSecret || !userId || !screenName) {
+      throw new Error('Invalid access token response')
+    }
 
-    // Get user info from X API
-    const userResponse = await fetch('https://api.x.com/2/users/me', {
+    console.log('Access token obtained, fetching user info')
+
+    // Get user information using OAuth 1.0a
+    const userTimestamp = Math.floor(Date.now() / 1000).toString()
+    const userNonce = Math.random().toString(36).substring(2, 15)
+    
+    const userOauthParams = {
+      oauth_consumer_key: process.env.TWITTER_API_KEY!,
+      oauth_nonce: userNonce,
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: userTimestamp,
+      oauth_token: accessToken,
+      oauth_version: '1.0'
+    }
+
+    const userParamString = Object.entries(userOauthParams)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    
+    const userSignatureBase = `GET&${encodeURIComponent('https://api.x.com/1.1/account/verify_credentials.json')}&${encodeURIComponent(userParamString)}`
+    const userSigningKey = `${encodeURIComponent(process.env.TWITTER_API_SECRET!)}&${encodeURIComponent(accessTokenSecret)}`
+    const userSignature = createHmac('sha1', userSigningKey).update(userSignatureBase).digest('base64')
+
+    const userAuthHeader = 'OAuth ' + Object.entries({
+      ...userOauthParams,
+      oauth_signature: userSignature
+    }).map(([key, value]) => `${key}="${encodeURIComponent(value)}"`).join(', ')
+
+    const userResponse = await fetch('https://api.x.com/1.1/account/verify_credentials.json', {
       headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
+        'Authorization': userAuthHeader
+      }
     })
 
     if (!userResponse.ok) {
-      const userErrorData = await userResponse.text()
-      console.error('User info fetch failed:', userErrorData)
-      throw new Error('Failed to fetch user info')
+      const userError = await userResponse.text()
+      console.error('User info fetch failed:', userError)
+      throw new Error(`User info fetch failed: ${userError}`)
     }
 
     const userData = await userResponse.json()
-    const { id: x_user_id, username: x_username } = userData.data
+    
+    console.log('User data received:', {
+      id: userData.id_str,
+      username: userData.screen_name,
+      name: userData.name
+    })
 
-    console.log('User info fetched successfully:', { x_user_id, x_username })
-
-    // Calculate token expiration
-    const tokenExpiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
-
-    // Encrypt tokens
-    const encryptedAccessToken = encryptToken(access_token)
-    const encryptedRefreshToken = refresh_token ? encryptToken(refresh_token) : null
-
-    // Generate session token
-    const sessionToken = generateRandomString(64)
-    const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-
-    // Create admin client for server-side database operations
     const supabaseAdmin = createSupabaseAdmin()
 
-    // Store/update account in database with session token
-    const { error: dbError } = await supabaseAdmin
+    // Check if this X account is already connected
+    const { data: existingAccount } = await supabaseAdmin
       .from('x_accounts')
-      .upsert(
-        {
-          x_user_id,
-          x_username,
-          is_connected: true,
-          connected_at: new Date().toISOString(),
-          encrypted_access_token_id: encryptedAccessToken,
-          encrypted_refresh_token_id: encryptedRefreshToken,
-          token_expires_at: tokenExpiresAt,
-          session_token: sessionToken,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'x_user_id',
-        }
-      )
+      .select('*')
+      .eq('x_user_id', userData.id_str)
+      .single()
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      throw new Error('Failed to store account data')
+    if (existingAccount) {
+      console.log('Account already exists, updating tokens')
+      
+      // Update existing account with new tokens
+      const { error: updateError } = await supabaseAdmin
+        .from('x_accounts')
+        .update({
+          access_token: encryptToken(accessToken),
+          access_token_secret: encryptToken(accessTokenSecret),
+          updated_at: new Date().toISOString()
+        })
+        .eq('x_user_id', userData.id_str)
+
+      if (updateError) {
+        console.error('Failed to update existing account:', updateError)
+        throw updateError
+      }
+
+      // Create/update user session for existing account
+      const sessionToken = generateRandomString(32)
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+      const { error: sessionError } = await supabaseAdmin
+        .from('user_sessions')
+        .upsert({
+          user_id: existingAccount.user_id,
+          session_token: sessionToken,
+          expires_at: expiresAt.toISOString()
+        })
+
+      if (sessionError) {
+        console.error('Failed to create/update session:', sessionError)
+        throw sessionError
+      }
+
+      const response = NextResponse.redirect(`${process.env.NEXTAUTH_URL}/`)
+      response.cookies.set('session_token', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+        path: '/',
+      })
+
+      // Clear OAuth temporary cookies
+      response.cookies.delete('oauth_token_secret')
+
+      return response
+    }
+
+    // Create new user and account
+    console.log('Creating new user and account')
+
+    const userId_new = generateRandomString(16)
+    const sessionToken = generateRandomString(32)
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+    // Insert new X account
+    const { error: accountError } = await supabaseAdmin
+      .from('x_accounts')
+      .insert({
+        user_id: userId_new,
+        x_user_id: userData.id_str,
+        x_username: userData.screen_name,
+        x_display_name: userData.name,
+        access_token: encryptToken(accessToken),
+        access_token_secret: encryptToken(accessTokenSecret),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+
+    if (accountError) {
+      console.error('Failed to create account:', accountError)
+      throw accountError
     }
 
     // Create user session
     const { error: sessionError } = await supabaseAdmin
       .from('user_sessions')
-      .upsert(
-        {
-          x_user_id,
-          x_username,
-          session_token: sessionToken,
-          expires_at: sessionExpiresAt.toISOString(),
-        },
-        {
-          onConflict: 'session_token',
-        }
-      )
+      .insert({
+        user_id: userId_new,
+        session_token: sessionToken,
+        expires_at: expiresAt.toISOString()
+      })
 
     if (sessionError) {
-      console.error('Session creation error:', sessionError)
-      throw new Error('Failed to create user session')
+      console.error('Failed to create session:', sessionError)
+      throw sessionError
     }
 
-    console.log('Account and session stored successfully in database')
+    console.log('Account and session created successfully')
 
-    // Clear OAuth cookies and set session cookie
-    const response = NextResponse.redirect(
-      new URL('/?connected=true', request.url)
-    )
-    
-    response.cookies.delete('oauth_code_verifier')
-    response.cookies.delete('oauth_state')
-
-    // Set session cookie
+    const response = NextResponse.redirect(`${process.env.NEXTAUTH_URL}/`)
     response.cookies.set('session_token', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -172,11 +255,15 @@ export async function GET(request: NextRequest) {
       path: '/',
     })
 
+    // Clear OAuth temporary cookies
+    response.cookies.delete('oauth_token_secret')
+
     return response
+
   } catch (error) {
-    console.error('Callback error:', error)
+    console.error('OAuth callback error:', error)
     return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent('connection_failed')}`, request.url)
+      `${process.env.NEXTAUTH_URL}/?error=callback_error`
     )
   }
 } 
