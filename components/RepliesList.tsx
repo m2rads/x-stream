@@ -100,138 +100,151 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
     return `https://twitter.com/${reply.author_username}/status/${reply.tweet_id}`
   }
 
+  const cleanReplyText = (text: string) => {
+    // Remove @username mentions at the beginning of the text
+    // This regex matches @username (allowing letters, numbers, underscores) at the start
+    // followed by optional whitespace
+    return text.replace(/^@\w+\s*/, '').trim()
+  }
+
   if (accountsLoading || loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Recent Replies
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            {accountsLoading ? 'Checking accounts...' : 'Loading replies...'}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-lg mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5" />
+              Recent Replies
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              {accountsLoading ? 'Checking accounts...' : 'Loading replies...'}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5" />
-            Recent Replies
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-red-600 dark:text-red-400">
-            {error}
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="w-full max-w-lg mx-auto">
+        <Card>
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="w-5 h-5" />
               Recent Replies
             </CardTitle>
-            <CardDescription>
-              {!hasConnectedAccounts 
-                ? 'Connect an account to see replies'
-                : replies.length === 0 
-                  ? 'No replies found'
-                  : `${replies.length} replies found`
-              }
-            </CardDescription>
-          </div>
-          
-          {onRefresh && hasConnectedAccounts && (
-            <div className="flex items-center gap-3">
-              {timeUntilNextPoll && 
-               !timeUntilNextPoll.includes('Connect account') && 
-               !timeUntilNextPoll.includes('Waiting for account') && (
-                <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                  Polling in {timeUntilNextPoll}
-                </span>
-              )}
-              <Button 
-                onClick={handleRefresh}
-                variant="outline" 
-                size="sm"
-                disabled={refreshing}
-                className="flex items-center gap-2"
-              >
-                <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-red-600 dark:text-red-400">
+              {error}
             </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!hasConnectedAccounts ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No account connected</p>
-            <p className="text-sm">Connect your X account to start monitoring replies</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full max-w-lg mx-auto">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Recent Replies
+              </CardTitle>
+              <CardDescription>
+                {!hasConnectedAccounts 
+                  ? 'Connect an account to see replies'
+                  : replies.length === 0 
+                    ? 'No replies found'
+                    : `${replies.length} replies found`
+                }
+              </CardDescription>
+            </div>
+            
+            {onRefresh && hasConnectedAccounts && (
+              <div className="flex items-center gap-3">
+                {timeUntilNextPoll && 
+                 !timeUntilNextPoll.includes('Connect account') && 
+                 !timeUntilNextPoll.includes('Waiting for account') && (
+                  <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                    Polling in {timeUntilNextPoll}
+                  </span>
+                )}
+                <Button 
+                  onClick={handleRefresh}
+                  variant="outline" 
+                  size="sm"
+                  disabled={refreshing}
+                  className="flex items-center gap-2"
+                >
+                  <RotateCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            )}
           </div>
-        ) : replies.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No replies yet</p>
-            <p className="text-sm">Check for new replies to see them here</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {replies.map((reply) => (
-              <div 
-                key={reply.id} 
-                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline">
-                        @{reply.author_username}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">→</span>
-                      <Badge variant="secondary">
-                        @{reply.target_username}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {formatDate(reply.tweet_created_at)}
-                      </span>
+        </CardHeader>
+        <CardContent>
+          {!hasConnectedAccounts ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No account connected</p>
+              <p className="text-sm">Connect your X account to start monitoring replies</p>
+            </div>
+          ) : replies.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No replies yet</p>
+              <p className="text-sm">Check for new replies to see them here</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {replies.map((reply) => (
+                <div 
+                  key={reply.id} 
+                  className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline">
+                          @{reply.author_username}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">→</span>
+                        <Badge variant="secondary">
+                          @{reply.target_username}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {formatDate(reply.tweet_created_at)}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm leading-relaxed">
+                        {cleanReplyText(reply.text)}
+                      </p>
                     </div>
                     
-                    <p className="text-sm leading-relaxed">
-                      {reply.text}
-                    </p>
+                    <a 
+                      href={getTweetUrl(reply)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                      title="View on X"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </div>
-                  
-                  <a 
-                    href={getTweetUrl(reply)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                    title="View on X"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 } 
