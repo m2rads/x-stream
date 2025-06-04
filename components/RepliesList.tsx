@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MessageCircle, ExternalLink, RotateCcw } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { MessageCircle, ExternalLink, RotateCcw, Search, X } from 'lucide-react'
 import { useXAccounts } from '@/hooks/useXAccounts'
 
 interface Reply {
@@ -27,10 +28,52 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [keywords, setKeywords] = useState<string[]>([])
+  const [currentKeyword, setCurrentKeyword] = useState('')
   
   // Get account connection status
   const { accounts, loading: accountsLoading } = useXAccounts()
   const hasConnectedAccounts = accounts.length > 0
+
+  const cleanReplyText = (text: string) => {
+    // Remove @username mentions at the beginning of the text
+    // This regex matches @username (allowing letters, numbers, underscores) at the start
+    // followed by optional whitespace
+    return text.replace(/^@\w+\s*/, '').trim()
+  }
+
+  // Filter replies based on keywords in real-time
+  const filteredReplies = useMemo(() => {
+    if (keywords.length === 0) {
+      return replies
+    }
+
+    return replies.filter(reply => {
+      const searchableText = `${cleanReplyText(reply.text)} ${reply.author_username}`.toLowerCase()
+      return keywords.some(keyword => 
+        searchableText.includes(keyword.toLowerCase())
+      )
+    })
+  }, [replies, keywords])
+
+  const addKeyword = () => {
+    const trimmedKeyword = currentKeyword.trim()
+    if (trimmedKeyword && !keywords.includes(trimmedKeyword)) {
+      setKeywords([...keywords, trimmedKeyword])
+      setCurrentKeyword('')
+    }
+  }
+
+  const removeKeyword = (keywordToRemove: string) => {
+    setKeywords(keywords.filter(keyword => keyword !== keywordToRemove))
+  }
+
+  const handleKeywordInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addKeyword()
+    }
+  }
 
   useEffect(() => {
     // Only fetch replies if we have connected accounts
@@ -100,13 +143,6 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
     return `https://twitter.com/${reply.author_username}/status/${reply.tweet_id}`
   }
 
-  const cleanReplyText = (text: string) => {
-    // Remove @username mentions at the beginning of the text
-    // This regex matches @username (allowing letters, numbers, underscores) at the start
-    // followed by optional whitespace
-    return text.replace(/^@\w+\s*/, '').trim()
-  }
-
   if (accountsLoading || loading) {
     return (
       <div className="w-full max-w-lg mx-auto">
@@ -162,7 +198,9 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
                   ? 'Connect an account to see replies'
                   : replies.length === 0 
                     ? 'No replies found'
-                    : `${replies.length} replies found`
+                    : keywords.length === 0
+                      ? `${replies.length} replies found`
+                      : `${filteredReplies.length} of ${replies.length} replies matching "${keywords.join(', ')}"`
                 }
               </CardDescription>
             </div>
@@ -188,6 +226,45 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
               </div>
             )}
           </div>
+          
+          {/* Keywords filter - only show when we have replies and accounts */}
+          {hasConnectedAccounts && replies.length > 0 && (
+            <div className="space-y-3">
+              {/* Keyword input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Add keyword and press Enter..."
+                  value={currentKeyword}
+                  onChange={(e) => setCurrentKeyword(e.target.value)}
+                  onKeyDown={handleKeywordInputKeyDown}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* Active keywords */}
+              {keywords.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map((keyword) => (
+                    <Badge 
+                      key={keyword} 
+                      variant="secondary" 
+                      className="flex items-center gap-1 pr-1"
+                    >
+                      <span>{keyword}</span>
+                      <button
+                        onClick={() => removeKeyword(keyword)}
+                        className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
+                        title={`Remove "${keyword}"`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {!hasConnectedAccounts ? (
@@ -202,9 +279,15 @@ export default function RepliesList({ onRefresh, timeUntilNextPoll }: RepliesLis
               <p>No replies yet</p>
               <p className="text-sm">Check for new replies to see them here</p>
             </div>
+          ) : filteredReplies.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No replies match your keywords</p>
+              <p className="text-sm">Try different keywords or clear the filter</p>
+            </div>
           ) : (
             <div className="space-y-4">
-              {replies.map((reply) => (
+              {filteredReplies.map((reply) => (
                 <div 
                   key={reply.id} 
                   className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
